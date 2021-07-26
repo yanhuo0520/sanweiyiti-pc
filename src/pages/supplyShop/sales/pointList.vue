@@ -1,0 +1,499 @@
+<template>
+    <div class="point-list"   :class="{'admin-tmp-con': isAdmin}" v-loading="loading">
+		<template v-if="isAdmin">
+        <div class="breadcrumb-con">
+            <img class="left-icon" src="../../../images/breadcrumb-left-icon.png" alt="">
+            <div class="breadcrumb-info">
+                <el-breadcrumb separator-class="el-icon-arrow-right">
+                    <el-breadcrumb-item  class="breadcrumb-tit">积分列表</el-breadcrumb-item>
+                </el-breadcrumb>
+            </div>
+          <el-button size="small" @click="initData()">刷新</el-button>
+        </div>
+        <div class="admin-con" v-loading="adminLoading">
+          <div class="org-menu-con">
+            <el-scrollbar wrap-class="scrollbar-wrapper">
+                <el-menu v-if="cooperativeList && cooperativeList.length > 0" class="el-menu-vertical-demo" :default-openeds="activeMenuArr"  :default-active="activeMenu" @open="handleOpen" :unique-opened="true" background-color="#F8FCFF">
+                  <div v-for="(item,index) in cooperativeList" :key="index">
+                    <template v-if="item.count > 0">
+                      <el-submenu :index="index+''" :show-timeout="1000">
+                          <template slot="title">
+                            <el-tooltip class="item" :ref="'menu'+item.coopera_id" :disabled="item.disabled" @mouseenter.native="tipMouseenter(item,1)"  :content="item.coopera_name" placement="right-start">
+                              <div class="menu-title">{{item.coopera_name}}</div>
+                            </el-tooltip>
+                            <div class="admin-tag-num">{{item.count}}</div>
+                          </template>
+                          <el-menu-item v-for="(subItem,subIndex) in item.children" :index="(index+'-'+subIndex)" @click="clickMenuItem(subItem)" :key="subIndex">
+                            <template slot="title">
+                              <el-tooltip class="item" :ref="'sub-menu'+subItem.coopera_id" effect="dark" :disabled="subItem.disabled" @mouseenter.native="tipMouseenter(subItem,2)" :content="subItem.coopera_name" placement="right-start">
+                                <div class="menu-item-title level2-title">
+                                  {{subItem.coopera_name}}
+                                </div>
+                              </el-tooltip>
+                            </template>
+                          </el-menu-item>
+                      </el-submenu>
+                    </template>
+                    <template v-else>
+                        <el-menu-item :index="index+''" @click="clickMenuItem(item)">
+                          <el-tooltip class="item" :ref="'menu'+item.coopera_id" @mouseenter.native="tipMouseenter(item,1)" :disabled="item.disabled" effect="dark" :content="item.coopera_name" placement="right-start">
+                            <div class="menu-title">{{item.coopera_name}}</div>
+                          </el-tooltip>
+                        </el-menu-item>
+                    </template>
+                  </div>
+                </el-menu>
+                <div class="no-menu-con" v-else>
+                  <div class="menu-absolute-center">
+                    <span class="text">暂无合作社信息</span>
+                  </div>
+                </div>
+            </el-scrollbar>
+          </div>
+          <div class="right-con" >
+            <el-scrollbar wrap-class="scrollbar-wrapper">
+              <div class="operate-con clearfix">
+                <div class="search-con"  >
+                    <el-form class="clearfix"  label-width="65px">
+						<el-form-item label="用户名称">
+							<el-input v-model="userName" placeholder="请输入用户名称" clearable></el-input>
+						</el-form-item>
+						<el-button  style="margin-left:15px" type="primary" size="small" :loading="loading" @click="search()">{{loading ? '获取数据中...' : '查询'}}</el-button>
+                    </el-form>
+                </div>
+              </div>
+              <div class="info-con">
+                  <template v-if="data && data.length > 0">
+                      <el-table :data="data" border >
+						<el-table-column prop="user_id" label="用户ID" width="70"  align="center"></el-table-column>
+						<el-table-column prop="user_name" label="用户名称" align="center" ></el-table-column>
+						<el-table-column prop="coopera_name" label="所属合作社" align="center" ></el-table-column>
+						<el-table-column prop="zonginter" label="积分余额" align="center"></el-table-column>
+						<el-table-column  label="操作" align="center" >
+							<template slot-scope="scope">
+								<el-button plain v-if="scope.row.inter_id" type="primary" size="small"  @click="detail(scope.row)">积分明细</el-button>
+							</template>
+						</el-table-column>
+					</el-table>
+                  </template>
+                  <div class="page-con">
+                    <el-pagination @current-change="handleCurPageChange" v-if="totalPage && totalPage > 0" background :current-page="curPage" layout="prev, pager, next" :total="totalPage*10"> </el-pagination>
+                  </div>
+                  <div style="height:5rem"></div>
+                  <div v-if="!data || data.length == 0">
+                    <template v-if="!data || data.length == 0">
+                      <div class="no-data-con" >
+                          <div class="absolute-center">
+                              <div class="err-info-text ">暂无积分列表</div>
+                          </div>
+                      </div>
+                    </template>
+                  </div>
+              </div>
+            </el-scrollbar>
+          </div>
+        </div>
+      </template>
+	  <template v-else>
+		  <div class="breadcrumb-con">
+			<img class="left-icon" src="../../../images/breadcrumb-left-icon.png" alt="">
+			<div class="breadcrumb-info">
+				<el-breadcrumb separator-class="el-icon-arrow-right">
+					<el-breadcrumb-item>{{adminType == 1 ? '供应商城' : '合作商城'}}</el-breadcrumb-item>
+					<el-breadcrumb-item  class="breadcrumb-tit">积分列表</el-breadcrumb-item>
+				</el-breadcrumb>
+			</div>
+			<el-button size="small" @click="initData()">刷新</el-button>
+		</div>
+		<div class="operate-con clearfix">
+            <div class="search-con">
+                <el-form class="clearfix"  label-width="65px">
+					<el-form-item label="合作社" v-if="isAdmin">
+						<el-select v-model="cooperaId" filterable placeholder="请选择合作社">
+							<el-option v-for="(item,index) in cooperativeList" :key="index" :label="item.coopera_name" :value="item.coopera_id"></el-option>
+						</el-select>
+					</el-form-item>
+                    <el-form-item label="用户名称">
+                        <el-input v-model="userName" placeholder="请输入用户名称" clearable></el-input>
+                    </el-form-item>
+                    <el-button  type="primary" size="small" :loading="loading" @click="search()">{{loading ? '获取数据中...' : '查询'}}</el-button>
+                </el-form>
+            </div>
+		</div>
+        <div class="table-con">
+            <template v-if="data && data.length > 0">
+                <el-table :data="data" border >
+					<el-table-column prop="user_id" label="用户ID" width="70"  align="center"></el-table-column>
+                    <el-table-column prop="user_name" label="用户名称" align="center" ></el-table-column>
+					 <el-table-column prop="coopera_name" label="所属合作社" align="center" ></el-table-column>
+                    <el-table-column prop="zonginter" label="积分余额" align="center"></el-table-column>
+                    <el-table-column  label="操作" align="center" >
+						<template slot-scope="scope">
+							<el-button plain v-if="scope.row.user_pwd_id" type="primary" size="small"  @click="detail(scope.row)">积分明细</el-button>
+						</template>
+					</el-table-column>
+                </el-table>
+            </template>
+            <template v-if="!data || data.length == 0">
+                <div class="no-data-con" >
+                    <div class="absolute-center">
+                        <div class="err-info-text ">暂无积分列表</div>
+                    </div>
+                </div>
+            </template>
+            <el-pagination @current-change="handleCurPageChange" v-if="totalPage && totalPage > 0" background :current-page="curPage" layout="prev, pager, next" :total="totalPage*10"> </el-pagination>
+        </div>
+	  </template>
+    </div>
+</template>
+<script>
+export default {
+  name: "pointList",
+  data() {
+    return {
+	  userName: '',
+
+      data: [],
+	  curPage: 1,
+	  totalPage: null,
+	  loading: false,
+
+	  isAdmin: false, // 是否为管理员
+	  adminType: '', // 管理员类型
+      cooperaId: '', //合作社id
+	  cooperativeList:[],
+
+    activeMenu: '0',
+    activeMenuArr: [],
+      adminLoading: false,
+      cooperationInfo: '',
+    };
+  },
+  activated() {
+	let isRefresh = this.$route.query.isRefresh // 1不刷新 2或者undefined刷新
+	if(isRefresh && isRefresh == 1) return
+	
+	this.loading = true
+	//判断是否为管理员
+	let adminType = localStorage.getItem('is_admin')
+	if(adminType && Number(adminType) >= 1) {
+		this.isAdmin = true
+		this.adminType = adminType
+	}
+	if(this.isAdmin) {
+		this.utils.getCooperativeList(this, data =>{
+			if(data && data.length > 1 && adminType == 3) {
+				this.cooperaId = data[1].coopera_id
+			} else {
+				this.cooperaId = ''
+			}
+			data.forEach(item =>{
+				item.children = []
+				item.disabled = true
+			})
+			this.cooperativeList = data
+			this.initData()
+		}, err =>{
+			this.loading = false
+		})
+	} else {
+		this.initData()
+	}
+  },	
+  methods: {
+	// 初始化信息
+	initData() {
+		this.data = []
+		this.curPage = 1
+		this.totalPage = null
+
+		if(this.cooperativeList && this.cooperativeList.length > 1 && this.adminType == 3) {
+            this.cooperaId = this.cooperativeList[1].coopera_id
+        } else {
+            this.cooperaId = ''
+        }
+    this.initActive()
+		this.getPointList()
+  },
+   // 初始化默认合作社
+    initActive() {
+      if(this.adminType == 3) {
+         if(!this.cooperativeList || this.cooperativeList.length < 1) return
+         this.activeMenu = '-1'
+          this.$nextTick(() =>{
+            this.activeMenu = '1'
+          })
+        // this.getLevel2Data('1',() =>{
+        //     this.$nextTick(() =>{
+        //       this.activeMenu = '1-0'
+        //     })
+        // })
+      } else {
+        // 勿删 直接赋值为0不起作用
+        this.activeMenu = '-1'
+        this.$nextTick(() =>{
+          this.activeMenu = '0'
+          this.activeMenuArr = []
+        })
+      }
+    },
+	// 合作社导航展开
+    handleOpen(index) {
+      if(this.cooperativeList[index].children.length > 0) return
+      this.getLevel2Data(index)
+    },
+    // 获取子级合作社列表
+    getLevel2Data(index, callBack){
+      this.ajax(
+        "cooperativeLevelList",{ parent_id: this.cooperativeList[index].coopera_id },"获取合作社列表失败",res => {
+          if(res.errno == 0) {
+            res.data.forEach(item  =>{
+              item.disabled = true
+            })
+            this.activeMenu = index
+              this.cooperativeList[index].children = res.data
+              callBack && typeof callBack == 'function' && callBack()
+          } else {
+              this.cooperativeList[index].children = []
+          }
+        },err => {
+            this.cooperativeList[index].children = []
+        }
+      );
+    },
+    // 点击合作社获取数据
+    clickMenuItem(item) {
+      
+      if(this.cooperaId) {
+        if(this.cooperaId == item.coopera_id) return
+      }
+      this.data = []
+      this.curPage = 1
+      this.totalPage = null
+      this.cooperaId = item.coopera_id
+      this.getPointList()
+    },
+    // dom移动事件
+    tipMouseenter(item,type) { // type 1-一级 2-二级
+      let isOverflow = '';
+        if(type == 1) {
+          isOverflow = this.$refs['menu'+item.coopera_id];
+        } else {
+          isOverflow = this.$refs['sub-menu'+item.coopera_id];
+        }
+      let cWidth = isOverflow[0].$el.clientWidth;
+      let sWidth = isOverflow[0].$el.scrollWidth;
+      if (sWidth > cWidth) { //超过 
+      this.$set(item, 'disabled', false);
+      } else {
+        this.$set(item, 'disabled', true);
+      }
+    },
+	// 搜索
+	search() {
+		this.data = []
+        this.curPage = 1
+        this.totalPage = null
+        this.getPointList()
+	},
+	// 获取积分列表
+	getPointList() {
+		let that = this
+		if(that.isAdmin) {
+			that.adminLoading = true
+		} else {
+			that.loading = true
+		}
+		that.ajax('userInterLists',{
+            page: that.curPage,
+			size: 10,
+			user_name: that.userName,
+			coopera_id: that.cooperaId
+        },'获取积分列表失败',res =>{
+			that.loading = false
+			that.adminLoading = false
+			if(res.errno == 0) {
+                that.curPage = Number(res.data.current_page)
+				that.totalPage = res.data.total
+				that.data = res.data.data
+			}
+		}, err =>{
+			that.loading = false
+			that.adminLoading = false
+		})
+    },
+    // 处理分页
+	handleCurPageChange(val) {
+		this.curPage = val;
+		this.getPointList()
+	},
+	// 积分明细
+	detail(row) {
+		if(row.inter_id) {
+			this.$router.push({
+				path: '/pointDetailList',
+				query: {
+					id: row.inter_id,
+					userName: row.user_name
+				}
+			})
+		} else {
+			this.$message.error('该用户数据异常,暂无积分明细ID')
+		}
+		
+	}
+  }
+};
+</script>
+<style lang="less">
+.point-list {
+  padding: 20px;
+  .el-pagination{
+        float: right;
+        margin-top: 30px;
+        margin-bottom: 30px;
+	}
+	.operate-con {
+	  padding: 10px 0;
+    .search-con {
+	  float: left;
+	  width: 80%;
+	  .el-form-item {
+		width: 28%;
+		float: left;
+		margin-bottom: 0;
+		.el-form-item__label {
+			font-size: 0.9rem;
+		}
+		.el-form-item__content {
+			margin-right: 30px;
+			.el-input {
+			width: 100%;
+			.read-idCard {
+				color: #3B6AF1;
+				background: #F0F8FF;
+				font-size: 0.75rem;
+				cursor: pointer;
+			}
+		}
+		}
+		
+	}
+    }
+    .btn-con {
+      float:right;
+    }
+  }
+    .table-con {
+	
+	}
+}
+.admin-tmp-con { 
+  padding: 0;
+  width: 100%; 
+  height: 100%; 
+  display: flex;
+  flex-direction: column;
+  .breadcrumb-con {
+    margin-bottom: 0;
+  }
+  .admin-con {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    .org-menu-con {
+      width: 16rem;
+      height: 100%;
+      background: #F8FCFF;
+      .level2-title {
+          color: #8F9BA7;
+      }
+      .level2-title::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 35px;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #8F9BA7;
+        transform: translateY(-50%);
+      }
+      .is-opened {
+        .el-icon-arrow-down {
+          color: #409EFF;
+        }
+        .is-active {
+          .level2-title {
+            color: #409EFF;
+          }
+          .level2-title::after {
+            background: #409EFF;
+          }
+        }
+        
+      }
+      .is-active {
+        background: #fff!important;
+      }
+      .menu-title {
+        width: 10rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .menu-item-title {
+        width: 7.5rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .no-menu-con {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        .menu-absolute-center {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%,-50%);
+          .text {
+            font-size: 0.9rem;
+            color: #999;
+
+          }
+        }
+      }
+    }
+    .right-con {
+      position: relative;
+      width: calc(100% - 16rem);
+      height: 99%;
+      padding: 10px;
+      .info-con {
+        position: relative;
+        width: 100%;
+        padding-top: 10px;
+      }
+      .operate-con {
+        padding: 0;
+      }
+      .operate-con+.el-table {
+        margin-top: 10px;
+      }
+    }
+    
+    .hide-menu {
+      width: 54px;
+    }
+    .page-con {
+      position: absolute;
+      bottom: 0;
+      right: 5rem;
+    }
+  }
+}
+
+</style>

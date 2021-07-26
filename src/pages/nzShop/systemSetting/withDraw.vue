@@ -1,0 +1,315 @@
+<template>
+    <div class="with-draw"  v-loading="loading">
+		<div class="breadcrumb-con">
+			<img class="left-icon" src="../../../images/breadcrumb-left-icon.png" alt="">
+			<div class="breadcrumb-info">
+				<el-breadcrumb separator-class="el-icon-arrow-right">
+					<el-breadcrumb-item>农资商城</el-breadcrumb-item>
+					<el-breadcrumb-item  class="breadcrumb-tit">农行提现</el-breadcrumb-item>
+				</el-breadcrumb>
+			</div>
+			<el-button size="small" @click="initData()">刷新</el-button>
+		</div>
+
+        <div class="with-draw-con">
+            <div class="card-info-con">
+                <div class="info">
+                    <div class="price">{{info && info.Balance ? info.Balance : 0}}</div>
+                    <div class="desc">账户余额</div>
+                </div>
+            </div>
+            <div class="account-con" v-if="info">
+                <div class="tit">账户信息</div>
+                <div class="main">
+                    <div class="name" v-if="info.AccountName">
+                        <div class="label">公司名称：</div>
+                        <div class="val">{{info.AccountName}}</div>
+                    </div>
+                    <div class="name" v-if="info.Account">
+                        <div class="label">银行卡号：</div>
+                        <div class="val">{{info.Account}}</div>
+                    </div>
+                </div>
+            </div>
+           <template v-if="isWithdraw">
+                <div class="input-con">
+                    <div class="tit">提现金额</div>
+                    <el-input v-model="price" placeholder="请输入内容" :readonly="submitLoading" clearable @focus="priceFocus" @blur="priceBlur" @input="priceInput">
+                        <template #append>
+                        <el-button type="text" @click="maxPriceClick" :disabled="!info || !Number(info.Balance)">全部提现</el-button>
+                        </template>
+                    </el-input>
+                </div>
+                <div class="btn-con">
+                    <el-button block round type="primary" :disabled="!Number(price)" :loading="submitLoading" @click="withDrawSubmit">提现</el-button>
+                </div>
+           </template>
+        </div> 
+    </div>
+</template>
+<script>
+export default {
+  name: "withDraw",
+  data() {
+    return {
+      loading: false,
+      info: null,
+      price: '',// 要提现的金额
+      submitLoading: false,
+      isWithdraw:false,
+    };
+  },
+  activated() {
+      this.initData()
+  },	
+  methods: {
+	// 初始化信息
+	initData() {
+      this.loading = false
+      this.info = null
+      this.price = ''
+      this.submitLoading = false
+      this.getAbcBalance()
+      this.handlePermission()
+    },
+    // 判断当前页面都有什么权限
+    handlePermission() { 
+      let that = this;
+      that.utils.getPermissionList(that,data =>{
+        data.forEach(item =>{
+          if(item.title == '提现') {
+            that.isWithdraw = true
+          }	
+        })
+      },'','goods_mod_id')
+    },
+	// 获取账户信息
+	getAbcBalance() {
+        let that = this
+        that.loading = true;
+		that.ajax('abcBalance',{},'获取账户信息失败',res =>{
+            that.loading = false
+			if(res.errno == 0) {
+                that.info = res.data
+			}
+		}, err =>{
+			that.loading = false
+		})
+    },
+    // 金额输入事件
+    priceInput(val) {
+        let tmpPrice = this.utils.handlePrice(val)
+        if(this.info) {
+            if(Number(tmpPrice) > Number(this.info.Balance) && Number(this.info.Balance) >= 0) {
+                tmpPrice = Number(this.info.Balance)
+            } else {
+                tmpPrice = 0
+            }
+        } else {
+             tmpPrice = 0
+        }
+        this.price = tmpPrice
+    },
+    // 金额获取焦点事件
+    priceFocus() {
+        document.querySelector('.input-con .el-input .el-input-group__append').style.borderColor = '#409EFF'
+    },
+    // 金额失去焦点事件
+    priceBlur() {
+         document.querySelector('.input-con .el-input .el-input-group__append').style.borderColor = '#DCDFE6'
+    },
+    // 全部提现按钮
+    maxPriceClick() {
+        if(this.submitLoading) return
+        if(this.info && this.info.Balance) {
+            if(Number(this.info.Balance) >= 0) {
+                this.price = this.info.Balance
+            } else {
+                this.price = 0
+            }   
+        }
+    },
+    // 提现按钮
+    withDrawSubmit(){
+        let that = this
+        that.submitLoading = true;
+		that.ajax('abcWithdraw',{
+            money: that.price
+        },'提现失败',res =>{
+            that.submitLoading = false
+			if(res.errno == 0) {
+                that.info.Balance = (Number(that.info.Balance)*1000 - Number(that.price)*1000)/1000  
+                that.price = ""
+                that.$message.success('提现成功')
+			}
+		}, err =>{
+			that.submitLoading = false
+		})
+    }
+  }
+};
+</script>
+<style lang="less">
+.with-draw {
+  padding: 20px;
+  .with-draw-con{
+      width: 36rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0 auto;
+       .card-info-con {
+        width: 100%;
+        height: 13rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;   
+        background: rgb(121, 187, 255);
+        border-radius: 10px;
+        .info {
+            display: flex;
+            align-items: center;
+            flex-direction: column;
+                color: #fff;
+            .price {
+                font-size: 3.5rem;
+                font-weight: bold;   
+            }
+            .desc {
+                font-size: 1.2rem;
+                padding-top: 5px;
+            }
+        }
+
+    }
+    .account-con {
+        width: 100%;
+        padding: 1rem 0;
+        .tit {
+            font-size: 1.3rem;
+            font-weight: bold;
+            padding-bottom: 1rem;
+            
+        } 
+        .main {
+            display: flex;
+            flex-direction: column;
+            .name {
+                display: flex;
+                align-items: center;   
+                margin-bottom: 1rem; 
+                font-size: 1rem;  
+            }
+        }
+    }
+    .input-con {
+        width: 100%;
+        padding: 1rem 0;
+      .tit {
+          font-size: 1.3rem;
+          font-weight: bold;
+          padding-bottom: 1rem;
+          
+      } 
+      .el-input {
+              .el-input__inner {
+                 border-width: 0;
+                 border-bottom-width: 1px;
+                 font-size: 1.2rem;
+                 height: 3rem;
+                 line-height: 3rem;
+                //  border-radius: none;
+              }
+            .el-input__suffix {
+                .el-icon-circle-close {
+                    font-size: 1.5rem
+                }
+            }
+
+            .el-input-group__append {
+                background: transparent;
+                border-width: 0px;
+                border-bottom-width: 1px; 
+                color: #409EFF;
+            }
+            
+          }
+        .el-input:hover {
+            .el-input-group__append {
+                border-color: #C0C4CC;
+            } 
+        }
+    }
+    .btn-con {
+        width: 60%;
+        height: 3.1rem;
+        margin-top: 2.5rem;
+        .el-button  {
+            width: 100%;
+            height: 100%;
+            border-radius: 1000px;
+            font-size: 1rem;
+        }
+    }
+  }
+
+  .rule-dialog-con {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.4);
+        .dialog-info {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            background:#fff;
+            transform:translate(-50%,-50%);
+            border-radius: 10px;
+            width: 35%;
+            padding: 30px 20px;
+            display:flex;
+            align-items: center;
+            justify-content:center;
+            flex-direction: column;
+            .rule-tit-con {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-bottom: 1.2rem;
+                .el-icon-warning {
+                    font-size: 24px;
+                    color:#e6a23c;
+                }
+                .dialog-tit {
+                    font-size: 18px;
+                    color:#303133;
+                    font-weight: bold;
+                    padding-left: 8px;
+                }
+            }
+            .info-con {
+                display: flex;
+                flex-direction: column;
+                .name {
+                    display: flex;
+                    align-items: center;   
+                    margin-bottom: 1rem; 
+                }
+            }
+            .el-form {
+                width: 80%;
+                .el-form-item {
+                    margin-bottom: 0;
+                }
+            }
+            .rule-btn-con {
+                padding-top: 20px;
+            }
+        }
+    }
+  
+}
+
+</style>

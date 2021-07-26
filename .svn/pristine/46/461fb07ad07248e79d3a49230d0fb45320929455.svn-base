@@ -1,0 +1,628 @@
+<template>
+    <div class="change-role" v-loading="loading">
+        <div class="logo-text">三位一体项目</div>
+        <div class="change-role-tip" v-if="chooseRoleRadio && changeRoleArr.length > 1">
+            <span class="tip">当前登陆账号共有{{changeRoleArr.length}}个角色</span>
+            <el-button round type="primary" plain size="mini" @click="changeRole">切换角色</el-button>
+        </div>
+        <div class="back-con" @click="goBack()"  v-if="source == 'navMenu'">
+            <img class="back-img" src="../images/login/back-icon.png" alt="">
+            <span class="back-text">返回</span>
+        </div>
+        <div class="change-con">
+            <template v-if="!chooseRoleRadio">
+                <div class="tit-con" >
+                    <span class="desc">角色</span>
+                    <span class="desc-tip" >请先选择您要登陆的角色</span>
+                </div>
+                <div class="radio-con">
+                    <div class="radio-item" :class="{'isSelect': item.isSelect}" v-for="(item,index) in changeRoleArr" :key="index" @click="chooseRole(item)">
+                        <div class="text">{{item.post_name}}</div>
+                        <div class="btn" v-if="!item.isSelect"></div>
+                        <img class="select-img" v-else src="../images/public/select-icon.png" alt="">
+                    </div>
+                </div>
+            </template>
+            <template v-else>
+                <div class="tit-con">
+                    <span class="desc">当前选择的角色:【{{chooseRoleText}}】</span>
+                    <span class="desc-tip">请选择您的身份</span>
+                </div>
+                <div class="select-con" v-if="workerJob && workerJob.length > 0">
+                    <el-dropdown @command="handleCoopera" trigger="click">
+                        <div class="dropdown-con">
+                            <img class="left-icon" src="../images/login/cooperation-img.png" alt="">
+                            <div class="right-con" >
+                                <div class="select-desc">合作社</div>
+                                <div class="select-role">
+                                    <div class="select-role-text">{{selectCooperaId ? selectCooperaName : '请选择合作社'}}</div>
+                                    <i class="el-icon-arrow-down" ></i>
+                                </div>
+                            </div>
+                        </div>
+                        <el-dropdown-menu slot="dropdown">
+                            <el-dropdown-item :command="index" :disabled="item.coopera_id == selectCooperaId" v-for="(item,index) in workerJob" :key="index">{{item.coopera_name}}</el-dropdown-item>
+                        </el-dropdown-menu>
+                    </el-dropdown>
+                </div>
+                <div class="select-con" v-if="jobArr && jobArr.length > 0">
+                    <el-dropdown @command="handlePost" trigger="click">
+                        <div class="dropdown-con">
+                            <img class="left-icon" src="../images/login/role-img.png" alt="">
+                            <div class="right-con">
+                                <div class="select-desc">身份</div>
+                                <div class="select-role">
+                                    <div class="select-role-text">{{selectPostId ? selectPostName : '请选择身份'}}</div>
+                                    <i class="el-icon-arrow-down"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <el-dropdown-menu slot="dropdown">
+                            <el-dropdown-item :command="index" :disabled="item.post_id == selectPostId" v-for="(item,index) in jobArr" :key="index">{{item.post_name}}</el-dropdown-item>
+                        </el-dropdown-menu>
+                    </el-dropdown>    
+                </div>
+                <div class="btn-con">
+                    <el-button  type="primary" round :disabled="!selectCooperaId || !selectPostId" @click="submit" :loading="submitLoading">{{submitLoading ? '正在获取权限...' : (!selectCooperaId ? '请先选择合作社' : (!selectPostId ? '请选择身份' : '获取权限'))}}</el-button>
+                </div>
+            </template>
+        </div>
+    </div>
+</template>
+<script>
+export default {
+  name: "changeRole",
+  data() {
+    return {
+        workerJob:[], // 合作社及旗下所有身份二维数组
+        jobArr: [], // 当前选中合作社下的身份数组
+
+        workerAllJobArr: [], // 所有合作社及身份二维数组
+
+        selectCooperaId: '',// 选择的合作社Id
+        selectCooperaName: '', // 选择的合作社名称
+
+        selectPostId: '', // 选择的身份id
+        selectPostName: '', // 选择的身份昵称
+        selectId: '', //选择的用户id
+        selectJobId: '', //选择的jobid
+
+        source: '', // 当前页面来源  ''-登录来源 'navMenu'-从页面内切换身份按钮跳转
+
+        loading: false,
+        submitLoading: false, //获取权限loading
+        fullScreenLoading: '',// 获取权限全局loading
+
+        changeRoleArr: [], //当前角色数组
+        chooseRoleRadio: '', //选择的角色 0-3 合作(联)社 1-超级管理员 2-区域管理员 4-供应商城权限 5-农资商城
+        chooseRoleText: '',
+    };
+  },
+  beforeRouteEnter(to,from,next){
+      next(self =>{
+        let userInfo = JSON.parse(localStorage.getItem('userInfo'))
+        let cooperationInfo = JSON.parse(localStorage.getItem('cooperationInfo'))
+        let adminType = localStorage.getItem('is_admin')
+        let tmpAllArr = JSON.parse(localStorage.getItem('workerJobArr'))
+        self.workerAllJobArr = tmpAllArr
+        self.changeRoleArr = JSON.parse(localStorage.getItem('roleArr'))
+
+        if(userInfo) { //从切换身份进入此页面
+            if(self.changeRoleArr && self.changeRoleArr.length > 0) {
+                self.changeRoleArr.forEach(item =>{
+                    if(adminType == item.is_admin) {
+                        item.isSelect = true
+                    }
+                })
+            }
+            if(adminType == 0 || adminType == 3) {
+                 self.chooseRoleRadio = adminType
+                 if(userInfo) {
+                    self.chooseRoleText = userInfo.post_name
+                    self.selectPostId = userInfo.post_id
+                    self.selectPostName = userInfo.post_name
+                    self.selectId = userInfo.id
+                    self.selectJobId = userInfo.job_id
+                    if(cooperationInfo) {
+                        self.selectCooperaId = cooperationInfo.id
+                        self.selectCooperaName = cooperationInfo.name
+                    }
+                    if(adminType == 0 || adminType == 3) { 
+                        let tmpArr = []
+                        if(tmpAllArr && tmpAllArr.length > 0) {
+                                tmpAllArr.forEach(item =>{
+                                    if(item.coopera_id > 0) {
+                                        if(item.job && item.job.length > 0) {
+                                            if(item.job[0].is_admin == 0 || item.job[0].is_admin == 3) {
+                                                tmpArr.push(item)
+                                            } 
+                                        }
+                                    }
+                                })
+                        }
+                        self.workerJob = tmpArr
+                    }
+                    self.workerJob.forEach(item =>{
+                        if(item.coopera_id == self.selectCooperaId) {
+                            self.jobArr = item.job
+                        }
+                    })
+                    self.isAdmin = adminType
+                 }
+            }
+            // self.loading = true
+            // self.utils.checkToken(self,res =>{
+            //     if(res && res.errno == 0) {
+              
+                   
+                    
+            //     } else {
+            //         self.loading = false
+            //     }
+            // })
+        } else { // 从登录进入此页面
+            if(from.path != '/login') {
+                self.$router.push('/login')
+                self.$message.error('请先登录')
+                return
+            }
+                self.selectCooperaId = ''
+                self.selectCooperaName = ''
+                self.chooseRoleRadio = ''
+                self.chooseRoleText = ''
+                self.selectPostId = '' // 选择的身份id
+                self.selectPostName = '' // 选择的身份昵称
+                self.selectId = '' //选择的用户id
+                self.selectJobId = ''//选择的jobid
+                self.workerJob =[] // 合作社及旗下所有身份二维数组
+                self.jobArr = []  // 当前选中合作社下的身份数组
+                if(self.changeRoleArr && self.changeRoleArr.length == 1) {
+                    self.chooseRoleRadio = self.changeRoleArr[0].is_admin
+                    self.chooseRoleText = self.changeRoleArr[0].post_name
+                    self.workerJob = self.workerAllJobArr
+                    if(self.workerJob && self.workerJob.length == 1) {
+                        if(self.workerJob[0].job && self.workerJob[0].job.length > 0) {
+                            self.selectCooperaId = self.workerJob[0].coopera_id
+                            self.selectCooperaName = self.workerJob[0].coopera_name
+                            self.jobArr = self.workerJob[0].job
+                            if(self.jobArr.length == 1) {
+                                self.selectPostId = self.jobArr[0].post_id
+                                self.selectPostName = self.jobArr[0].post_name
+                                self.selectId = self.jobArr[0].user_id
+                                self.selectJobId = self.jobArr[0].job_id
+                            }
+                        }
+                        
+                    }
+                }
+                // if(self.workerJob.length == 1) { // 如果当前账号只加入一个合作社默认选择第一个
+                //     self.selectCooperaId = self.workerJob[0].coopera_id
+                //     self.selectCooperaName = self.workerJob[0].coopera_name
+                //     self.jobArr = self.workerJob[0].job
+                //     if(self.jobArr && self.jobArr.length > 0) {
+                //         if(self.jobArr.length == 1) {
+                //             self.selectPostId = self.jobArr[0].post_id
+                //             self.selectPostName = self.jobArr[0].post_name
+                //             self.selectJobId = self.jobArr[0].job_id
+                //             self.selectId = self.jobArr[0].user_id
+                //             self.isAdmin = self.jobArr[0].is_admin
+                //         } else {
+                //             self.selectPostId = ''
+                //             self.selectPostName = ''
+                //             self.selectJobId = ''
+                //             self.selectId = ''
+                //             self.isAdmin = ''
+                //         }
+                //     } 
+                // } else {
+                //     self.selectCooperaId = ''
+                //     self.selectCooperaName = ''
+                // }
+            
+        }
+        self.source = self.$route.query.source
+      })
+  },
+  mounted(){},
+  methods: {
+    // 返回上一页
+    goBack() {
+        this.$router.push('/index')
+    },
+    // 改变角色
+    changeRole() {
+        this.chooseRoleRadio = ''
+    },
+    // 选择角色
+    chooseRole(row) {
+        let tmpAllArr = this.workerAllJobArr
+        this.changeRoleArr.forEach(item =>{
+            item.isSelect = false
+        })
+        row.isSelect = true
+        this.chooseRoleRadio = row.is_admin
+        this.chooseRoleText = row.post_name
+        if(row.is_admin == '0-3') { //当选择合作(联)社
+           let tmpArr = []
+           if(tmpAllArr && tmpAllArr.length > 0) {
+                tmpAllArr.forEach(item =>{
+                    if(item.coopera_id > 0) {
+                        if(item.job && item.job.length > 0) {
+                            if(item.job[0].is_admin == 0 || item.job[0].is_admin == 3) {
+                                tmpArr.push(item)
+                            } 
+                        }
+                    }
+                })
+           }
+           this.workerJob = tmpArr
+        }
+        if(row.is_admin == 2) {
+            this.isAdmin = 2
+            if(tmpAllArr && tmpAllArr.length > 0) {
+                tmpAllArr.forEach(item =>{
+                    if(item.coopera_id == 0) {
+                        this.selectCooperaName = item.coopera_name
+                        this.selectCooperaId = item.coopera_id
+                        if(item.job && item.job.length > 0) {
+                            this.selectPostName = item.job[0].post_name
+                            this.selectPostId = item.job[0].post_id
+                            this.selectId = item.job[0].user_id
+                            this.selectJobId = item.job[0].job_id
+                            this.getPrivilege(this.selectPostId)
+                        }
+                    }
+                })
+           }
+        }
+    
+        if(row.is_admin == 4) {
+            let tmpArr = []
+            this.isAdmin = 4
+            if(tmpAllArr && tmpAllArr.length > 0) {
+                tmpAllArr.forEach(item =>{
+                    if(item.coopera_id > 0) {
+                        if(item.job && item.job.length > 0) {
+                            if(item.job[0].is_admin == 4) {
+                                tmpArr.push(item)
+                            } 
+                        }
+                    }
+                })
+            }
+            this.workerJob = tmpArr
+            this.getToken(this.workerJob,4)
+        }
+        if(row.is_admin == 5) {
+            let tmpArr = []
+            this.isAdmin = 5
+            if(tmpAllArr && tmpAllArr.length > 0) {
+                tmpAllArr.forEach(item =>{
+                    if(item.coopera_id > 0) {
+                        if(item.job && item.job.length > 0) {
+                            if(item.job[0].is_admin == 5) {
+                                tmpArr.push(item)
+                            } 
+                        }
+                    }
+                })
+            }
+            this.workerJob = tmpArr
+            this.getToken(this.workerJob,5)
+        }
+        // if(this.chooseRoleRadio == 4) {
+        //   this.getToken(this.handleSupplyArr,4)
+        //   return
+        // }
+        // if(this.chooseRoleRadio == 5) {
+        //   this.getToken(this.handleNzArr,5)
+        // }
+        // let wokerJob = this.workerJobArr
+        // let tmpNoIdJobArr = [] //区域管理员worker_job数组
+        // let tmpIdJobArr = [] //其它角色worker_job数组
+        // wokerJob.forEach(item =>{
+        //   if(item.coopera_id && Number(item.coopera_id) > 0) {
+        //     tmpIdJobArr.push(item)
+        //   } else {
+        //     tmpNoIdJobArr.push(item)
+        //   }
+        // })
+        // if(val == 2) {
+        //   localStorage.setItem('worker_job',JSON.stringify(tmpNoIdJobArr))
+        //   this.getPrivilege(tmpNoIdJobArr) 
+        // }else {
+        //   localStorage.setItem('worker_job',JSON.stringify(tmpIdJobArr))
+        //   if(tmpIdJobArr && tmpIdJobArr.length > 1) {
+        //     this.$router.push('/changeRole')
+        //     return
+        //   }
+        //   if(tmpIdJobArr && tmpIdJobArr.length == 1) {
+        //     if(tmpIdJobArr[0].job && tmpIdJobArr[0].job.length > 1) {
+        //       this.$router.push('/changeRole')
+        //       return
+        //     }
+        //     if(tmpIdJobArr[0].job && tmpIdJobArr[0].job.length == 1) {
+        //       this.getPrivilege(tmpIdJobArr) 
+        //     }
+        //   }
+        // }
+    },
+     // 获取token 注:仅当供应商城与农资商城权限使用
+      getToken(workerJob,type) { // type 4-供应商城 5-农资商城
+         let that = this;
+          let cooperationInfo = {}
+          let userInfo = {}
+          cooperationInfo.name = workerJob[0].coopera_name;
+          cooperationInfo.id = workerJob[0].coopera_id;
+          userInfo.post_name = workerJob[0].job[0].post_name;
+          userInfo.post_id = workerJob[0].job[0].post_id;
+          userInfo.id = workerJob[0].job[0].user_id;
+          userInfo.job_id =  workerJob[0].job[0].job_id;
+            that.ajax('get_token',{
+                post_id:userInfo.post_id,
+                user_id: userInfo.id,
+                job_id: userInfo.job_id,
+                coopera_id: workerJob[0].coopera_id,
+                is_admin: type,
+            },'获取权限失败',res =>{
+                if(res.errno == 0) {
+                    sessionStorage.setItem('token',res.token)
+                    localStorage.setItem('cooperationInfo', JSON.stringify(cooperationInfo))
+                    localStorage.setItem('userInfo', JSON.stringify(userInfo))
+                    localStorage.setItem('is_admin', workerJob[0].job[0].is_admin)
+                    if(type == 4) {
+                        that.$router.push('/supplyIndex')
+                    } else if(type == 5){
+                        that.$router.push('/nzIndex')
+                    }
+                } else {
+                    this.isAdmin = ''
+                }
+            }, err =>{
+                that.isAdmin = ''
+                // that.fullScreenLoading.close()
+            })
+      },
+    // 选择合作社
+    handleCoopera(index) {
+        this.selectCooperaName = this.workerJob[index].coopera_name
+        this.selectCooperaId = this.workerJob[index].coopera_id
+        this.jobArr = this.workerJob[index].job
+        if(this.jobArr && this.jobArr.length > 0) {
+            if(this.jobArr.length == 1) {
+                this.selectPostId = this.jobArr[0].post_id
+                this.selectPostName = this.jobArr[0].post_name
+                this.selectJobId = this.jobArr[0].job_id
+                this.selectId = this.jobArr[0].user_id
+                this.isAdmin = this.jobArr[0].is_admin
+            } else {
+                this.selectPostId = ''
+                this.selectPostName = ''
+                this.selectJobId = ''
+                this.selectId = ''
+                this.isAdmin = ''
+            }
+        }
+    },
+    // 选择身份
+    handlePost(index) {
+        this.selectPostId = this.jobArr[index].post_id
+        this.selectPostName = this.jobArr[index].post_name
+        this.isAdmin = this.jobArr[index].is_admin
+        this.selectId = this.jobArr[index].user_id
+        this.selectJobId = this.jobArr[index].job_id
+        // if(this.jobArr && this.jobArr.length > 0) {
+        //     if(this.jobArr.length == 1) {
+        //         this.selectPostId = this.jobArr[0].post_id
+        //         this.selectPostName = this.jobArr[0].post_name
+        //         this.selectId = this.jobArr[0].user_id
+        //         this.selectJobId = this.jobArr[0].job_id
+        //     }
+        // }
+        // this.getPrivilege(this.selectPostId)
+    },
+    // 获取权限提交按钮
+    submit() {
+        this.getPrivilege(this.selectPostId)
+    },
+    // 获取当前身份权限
+    getPrivilege(id){
+        let that = this;
+        let cooperationInfo = {}
+        let userInfo = {}
+        that.submitLoading = true
+        cooperationInfo.name = that.selectCooperaName;
+        cooperationInfo.id = that.selectCooperaId;
+        userInfo.post_name = that.selectPostName;
+        userInfo.post_id = that.selectPostId;
+        userInfo.id = that.selectId;
+        userInfo.job_id = that.selectJobId;
+        that.fullScreenLoading = that.$loading({ text: '正在重新获取权限...', background:'rgba(0, 0, 0, 0.7)' });
+        that.ajax('get_privilege',{
+            post_id:id,
+            user_id: userInfo.id,
+            job_id: userInfo.job_id
+        },'获取权限失败',res =>{
+            that.submitLoading = false
+            that.fullScreenLoading.close()
+            if(res.errno == 0) {
+                sessionStorage.setItem('token', res.token)
+                localStorage.setItem('cooperationInfo', JSON.stringify(cooperationInfo))
+                localStorage.setItem('userInfo', JSON.stringify(userInfo))
+                localStorage.setItem('routes', JSON.stringify(res.data))
+                localStorage.setItem('is_admin', that.isAdmin)
+                that.$router.push('/index')
+            } 
+        }, err =>{
+            that.submitLoading = false
+            that.fullScreenLoading.close()
+        })
+        
+    },
+  }
+};
+</script>
+<style lang="less">
+.change-role {
+    width: 100%;
+    height: 100%;
+    background: #f8f8f8;
+    .logo-text {
+        padding: 1rem 5rem;
+        background: #fff;
+        font-weight: bold;
+        font-size: 1.3rem;
+    }
+    .change-role-tip {
+        padding: 10px;
+        background: #fdf6ec;
+        color: #e6a23c;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        .tip {
+            margin-right: 30px;
+        }
+    }
+    .back-con {
+        display: flex;
+        align-items: center;
+        padding-top: 2rem;
+        padding-left: 5rem;
+        cursor: pointer;
+        .back-img {
+            width: 20px;
+        }
+        .back-text {
+            padding-left: 10px;
+            font-weight: bold;
+        }
+    }
+    .change-con {
+        position: absolute;
+        top: 45%;
+        left: 50%;
+        transform: translate(-50%,-50%);
+        width: 80%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        .radio-con {
+            display: flex;
+            align-items: center;
+            .radio-item {
+                padding: 15px 20px;
+                background: #fff;
+                border: 1px solid #dcdfe6;
+                border-radius: 8px;
+                margin-right: 20px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                min-width: 200px;
+                cursor: pointer;
+                .text { 
+                    color: #333;
+                }
+                .btn {
+                    width: 20px;
+                    height: 20px;
+                    border: 1px solid #dcdfe6; 
+                    border-radius: 50%;
+                    
+                }
+                .select-img {
+                    width: 20px;
+                    height: 20px;
+                }
+            }
+            .isSelect {
+                border-color: #409eff;
+                .text { 
+                    color: #409eff;
+                }
+                .btn {
+                    border-color:#409eff; 
+                }
+            }
+            .radio-item:hover {
+                border-color: #409eff;
+                 .text { 
+                    color:#409eff;
+                }
+                .btn {
+                   border-color: #409eff;
+                }
+            }
+        }
+        .tit-con {
+            display: flex;
+            align-items: center;
+            flex-direction: column;
+            padding-bottom: 4rem;
+            .desc {
+                font-weight: bold;
+                font-size: 1.6rem;
+            }
+            .desc-tip {
+                font-size: 1rem;
+                color: #888888;
+                padding-top: 1rem;
+            }
+        }
+        .select-con {
+            background: #fff;
+            box-shadow: 0 0 10px #ccc;
+            display: flex;
+            align-items: center;
+            padding: 0.7rem 1rem;
+            margin-bottom: 2rem;
+            border-radius: 4px;
+            .dropdown-con {
+                display: flex;
+            align-items: center;
+            }
+            .left-icon {
+                width: 3rem;
+                height: 3rem;
+                margin-right: 1rem;
+            }
+            .right-con {
+                display: flex;
+                // align-items: center;
+                flex-direction: column;
+                cursor: pointer;
+                .select-desc {
+                    color: #000;
+                    font-weight: bold;
+                    font-size: 1.1rem;
+                    padding-bottom: 1rem;
+                }
+                .select-role {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    color: #888888;
+                    .select-role-text {
+                        width: 15rem;
+                        font-size: 0.9rem;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                    }
+                }
+
+            }
+
+        }
+        .btn-con {
+            margin-top: 1rem;
+            .el-button {
+                width: 16rem;
+            }
+        }
+    }
+}
+
+</style>

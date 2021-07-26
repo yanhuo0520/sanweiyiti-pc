@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html style="overflow-x: hidden;overflow-y: hidden;" >
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="edge" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,Chrome=1" />
+    <meta name=”renderer” content=”webkit” />  
+    <meta name=”renderer” content=”ie-comp” />  
+    <!-- <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"> -->
+    <!-- <meta name="viewport" content="width=device-width, initial-scale=1.0"> -->
+    <title>三位一体后台管理</title>
+    <!-- <script type="text/javascript" src="/static/js/qwebchannel.js"></script> -->
+    <style>
+      @media screen and (min-width: 100px)and (max-width: 1400px) {
+        body,html{
+          font-size: 12px !important;
+        }
+      }
+      @media screen and (min-width: 1400px)and (max-width: 2000px) {
+        body,html{
+          font-size: 14px !important;
+        }
+      }
+      body,html{
+         min-width: 1400px;
+         overflow-y: hidden;
+         overflow-x: hidden;
+        }
+      div { box-sizing: border-box; }
+      button { outline: none; cursor: pointer; }
+      button:active { opacity: 0.6; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <!-- built files will be auto injected -->
+  </body>
+  <script>
+  </script>
+</html>

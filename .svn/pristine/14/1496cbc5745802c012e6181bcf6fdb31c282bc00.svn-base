@@ -1,0 +1,539 @@
+<template>
+    <div class="confrere-approve-list" v-loading="loading">
+	<div class="breadcrumb-con">
+		<img class="left-icon" src="../../images/breadcrumb-left-icon.png" alt="">
+		<div class="breadcrumb-info">
+			<el-breadcrumb separator-class="el-icon-arrow-right">
+				<el-breadcrumb-item>基础信息</el-breadcrumb-item>
+				<el-breadcrumb-item  class="breadcrumb-tit">社员审批列表</el-breadcrumb-item>
+			</el-breadcrumb>
+		</div>
+		 <el-button size="small" @click="initData()">刷新</el-button>
+	</div>
+      <div class="operate-con clearfix">
+        <div class="search-con">
+         <el-form class="clearfix"  label-width="65px">
+            <el-form-item label="社员名称">
+              <el-input v-model="userName" placeholder="请输入社员姓名" clearable></el-input>
+            </el-form-item>
+            <el-form-item label="身份证号">
+              <el-input v-model="idCard" placeholder="请输入社员身份证号" clearable></el-input>
+            </el-form-item>
+			<el-form-item label="社员类型" style="margin-top:0.5rem">
+              <el-select v-model="cooperaCls" placeholder="请选择社员类型">
+				<el-option v-for="(item,index) in confrereTypeOptions" :key="index" :label="item.name" :value="item.id"></el-option>
+			</el-select>
+            </el-form-item>
+			<el-form-item label="日期范围" style="margin-top:0.5rem">
+              <el-date-picker v-model="dateArr" type="daterange" :picker-options="pickerOptions" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" align="right"> </el-date-picker>
+            </el-form-item>
+			<el-button style="margin-top: 25px" type="primary" size="small" :loading="loading" @click="search()">{{loading ? '获取数据中...' : '查询'}}</el-button>
+         </el-form>
+        </div>
+	</div>
+	  <el-tabs  type="border-card" v-model="confrereAttr" @tab-click="handleTabClick" >
+			<el-tab-pane label="自然人" name="1"></el-tab-pane>
+			<el-tab-pane label="机构" name="2"></el-tab-pane>
+			<el-tab-pane label="集体经济组织" name="3"></el-tab-pane>
+			<div class="table-con" >
+				<template v-if="data && data.length > 0 && confrereAttr == 1">
+					<el-table :data="data" border >
+						<!-- <el-table-column type="expand">
+							<template slot-scope="props">
+								<el-form label-position="left" inline class="demo-table-expand">
+									<el-form-item label="出资类型">
+										<span>{{ props.row.guarantee[0].zi_type }}</span>
+									</el-form-item>
+									<el-form-item label="出资金额">
+										<span>{{ props.row.guarantee[0].money }}</span>
+									</el-form-item>
+									<el-form-item label="股金类型">
+										<span>{{ props.row.guarantee[0].gu_type }}</span>
+									</el-form-item>
+									<el-form-item label="出资备注">
+										<span>{{ props.row.guarantee[0].zi_note }}</span>
+									</el-form-item>
+									<el-form-item label="相关资料图片">
+										<span v-if="props.row.guarantee[0].imgs && props.row.guarantee[0].imgs.length > 0" style="color:#3a8ee6;cursor:pointer" @click="showImgView(props.row.guarantee[0].imgs)">查看图片</span>
+									</el-form-item>
+								</el-form>
+							</template>
+						</el-table-column> -->
+						<el-table-column prop="user_id" label="ID"  width="60px" align="center"></el-table-column>
+						<el-table-column prop="name" label="社员姓名"   align="center"></el-table-column>
+						<el-table-column  label="性别" align="center" >
+							<template slot-scope="scope">
+								<span>{{scope.row.sex == 2 ? '女' : '男'}}</span>
+							</template>
+						</el-table-column>
+						<el-table-column prop="idcard" label="身份证"  align="center"></el-table-column>
+						<el-table-column prop="phone" label="联系方式" align="center" ></el-table-column>
+						<!-- <el-table-column prop="coopera_name" label="合作社名称" align="center"></el-table-column> -->
+						<!-- <el-table-column prop="coopera_address" label="合作社地址" width="200px" align="center" show-overflow-tooltip></el-table-column> -->
+						<el-table-column   prop="add_time" label="创建时间" width="160"  align="center" ></el-table-column>
+						<el-table-column prop="address" label="操作" :width="isApprove ? '220px' : '90px'" align="center">
+							<template slot-scope="scope">
+								<el-button plain size="small" @click="detail(scope.row)">查看</el-button>
+								<template v-if="scope.row.status == 0 && isApprove">
+									<el-button type="primary" plain size="small" @click="handleBtn(1,scope.row,scope.$index)">同意</el-button>
+									<el-button type="danger" plain size="small" @click="handleBtn(2,scope.row,scope.$index)">拒绝</el-button>
+								</template>
+							</template>
+						</el-table-column>
+					</el-table>
+					<el-pagination @current-change="handleCurPageChange" v-if="totalPage && totalPage > 0" background :current-page="curPage" layout="prev, pager, next" :total="totalPage*10"> </el-pagination>
+				</template>
+				<template v-if="data && data.length > 0 && confrereAttr == 2">
+					<el-table :data="data" border >
+						<!-- <el-table-column type="expand">
+							<template slot-scope="props">
+								<el-form label-position="left" inline class="demo-table-expand">
+									<el-form-item label="出资类型">
+										<span>{{ props.row.guarantee[0].zi_type }}</span>
+									</el-form-item>
+									<el-form-item label="出资金额">
+										<span>{{ props.row.guarantee[0].money }}</span>
+									</el-form-item>
+									<el-form-item label="股金类型">
+										<span>{{ props.row.guarantee[0].gu_type }}</span>
+									</el-form-item>
+									<el-form-item label="出资备注">
+										<span>{{ props.row.guarantee[0].zi_note }}</span>
+									</el-form-item>
+									<el-form-item label="相关资料图片">
+										<span v-if="props.row.guarantee[0].imgs && props.row.guarantee[0].imgs.length > 0" style="color:#3a8ee6;cursor:pointer" @click="showImgView(props.row.guarantee[0].imgs)">查看图片</span>
+									</el-form-item>
+								</el-form>
+							</template>
+						</el-table-column> -->
+						<el-table-column prop="user_id" label="ID"  width="60px" align="center"></el-table-column>
+						<el-table-column prop="short_name" label="机构名称"   show-overflow-tooltip align="center"></el-table-column>
+						<el-table-column prop="address" label="机构地址" align="center" show-overflow-tooltip></el-table-column>
+						<el-table-column prop="license_num" label="社会信用代码"   align="center"></el-table-column>
+						<!-- <el-table-column prop="license_start" label="成立日期" width="100px" align="center"></el-table-column>
+						<el-table-column prop="license_end" label="营业有效期" width="100px" align="center"></el-table-column> -->
+						<el-table-column prop="name" label="法人姓名"  align="center"></el-table-column>
+						<el-table-column prop="phone" label="法人手机号"  align="center"></el-table-column>
+						<el-table-column   prop="add_time" label="创建时间" width="160"  align="center" ></el-table-column>
+						<el-table-column prop="address" label="操作" :width="isApprove ? '220px' : '90px'" align="center">
+							<template slot-scope="scope">
+								<el-button plain size="small" @click="detail(scope.row)">查看</el-button>
+								<template v-if="scope.row.status == 0 && isApprove">
+									<el-button type="primary" plain size="small" @click="handleBtn(1,scope.row,scope.$index)">同意</el-button>
+									<el-button type="danger" plain size="small" @click="handleBtn(2,scope.row,scope.$index)">拒绝</el-button>
+								</template>
+							</template>
+						</el-table-column>
+					</el-table>
+					<el-pagination @current-change="handleCurPageChange" v-if="totalPage && totalPage > 0" background :current-page="curPage" layout="prev, pager, next" :total="totalPage*10"> </el-pagination>
+				</template>
+				<template v-if="data && data.length > 0 && confrereAttr == 3">
+					<el-table :data="data" border >
+						<!-- <el-table-column type="expand">
+							<template slot-scope="props">
+								<el-form label-position="left" inline class="demo-table-expand">
+									<el-form-item label="出资类型">
+										<span>{{ props.row.guarantee[0].zi_type }}</span>
+									</el-form-item>
+									<el-form-item label="出资金额">
+										<span>{{ props.row.guarantee[0].money }}</span>
+									</el-form-item>
+									<el-form-item label="股金类型">
+										<span>{{ props.row.guarantee[0].gu_type }}</span>
+									</el-form-item>
+									<el-form-item label="出资备注">
+										<span>{{ props.row.guarantee[0].zi_note }}</span>
+									</el-form-item>
+									<el-form-item label="相关资料图片">
+										<span v-if="props.row.guarantee[0].imgs && props.row.guarantee[0].imgs.length > 0" style="color:#3a8ee6;cursor:pointer" @click="showImgView(props.row.guarantee[0].imgs)">查看图片</span>
+									</el-form-item>
+								</el-form>
+							</template>
+						</el-table-column> -->
+						<el-table-column prop="user_id" label="ID"  width="60px" align="center"></el-table-column>
+						<el-table-column prop="short_name" label="组织名称"   show-overflow-tooltip align="center"></el-table-column>
+						<el-table-column prop="address" label="组织地址" align="center" show-overflow-tooltip></el-table-column>
+						<el-table-column prop="license_num" label="社会信用代码"   align="center"></el-table-column>
+						<!-- <el-table-column prop="license_start" label="成立日期" width="100px" align="center"></el-table-column>
+						<el-table-column prop="license_end" label="营业有效期" width="100px" align="center"></el-table-column> -->
+						<el-table-column prop="name" label="法人姓名"  align="center"></el-table-column>
+						<el-table-column prop="phone" label="法人手机号"  align="center"></el-table-column>
+						<el-table-column   prop="add_time" label="创建时间" width="160"  align="center" ></el-table-column>
+						<el-table-column prop="address" label="操作" :width="isApprove ? '220px' : '90px'" align="center">
+							<template slot-scope="scope">
+								<el-button plain size="small" @click="detail(scope.row)">查看</el-button>
+								<template v-if="scope.row.status == 0 && isApprove">
+									<el-button type="primary" plain size="small" @click="handleBtn(1,scope.row,scope.$index)">同意</el-button>
+									<el-button type="danger" plain size="small" @click="handleBtn(2,scope.row,scope.$index)">拒绝</el-button>
+								</template>
+							</template>
+						</el-table-column>
+					</el-table>
+					<el-pagination @current-change="handleCurPageChange" v-if="totalPage && totalPage > 0" background :current-page="curPage" layout="prev, pager, next" :total="totalPage*10"> </el-pagination>
+				</template>
+				<template v-if="!data || data.length == 0">
+					<div class="no-data-con" >
+						<div class="absolute-center">
+							<div class="err-info-text ">暂无{{confrereAttr == 1 ? '自然人' : (confrereAttr == 2 ? '机构' : '集体经济组织')}}审批</div>
+						</div>
+					</div>
+				</template>
+		</div>
+	  </el-tabs>
+
+	  <template v-if="showViewer">
+            <el-image-viewer :on-close="closeImgView"  :url-list="showViewImgs" />
+        </template> 
+      
+    </div>
+</template>
+<script>
+import ElImageViewer from 'element-ui/packages/image/src/image-viewer'
+export default {
+  name: "confrereList",
+  data() {
+    return {
+	  userName: '',
+	  idCard: '',
+	  lastSearch: '',
+	  dateArr: '',
+	  confrereAttr: '1',
+	  data: [],
+	  curPage: 1,
+	  totalPage: null,
+      loading: false,
+	  status: 0,
+	  showViewer: false,
+	  showViewImgs: [],
+
+	  cooperaCls: '',
+	  confrereTypeOptions: [{
+            name: '全部',
+            id: '',
+        },{
+            name: '基本成员',
+            id: 1
+        },{
+            name: '核心成员',
+            id: 2
+        },{
+            name: '联系成员',
+            id: 3
+        },{
+            name: '特邀成员',
+            id: 4
+		}], //社员类型列表
+		pickerOptions: {
+          shortcuts: [{
+            text: '最近一周',
+            onClick(picker) {
+              const end = new Date();
+              const start = new Date();
+              start.setTime(start.getTime() - 3600 * 1000 * 24 * 7);
+              picker.$emit('pick', [start, end]);
+            }
+          }, {
+            text: '最近一个月',
+            onClick(picker) {
+              const end = new Date();
+              const start = new Date();
+              start.setTime(start.getTime() - 3600 * 1000 * 24 * 30);
+              picker.$emit('pick', [start, end]);
+            }
+          }, {
+            text: '最近三个月',
+            onClick(picker) {
+              const end = new Date();
+              const start = new Date();
+              start.setTime(start.getTime() - 3600 * 1000 * 24 * 90);
+              picker.$emit('pick', [start, end]);
+            }
+          }]
+        },
+	  
+	  isApprove: false, // 是否有审批权限
+    };
+  },
+components: { ElImageViewer },
+  beforeRouteEnter (to,	from, next) {
+	  next(that =>{
+		that.loading = false
+		let isRefresh = that.$route.query.isRefresh // 1不刷新 2或者undefined刷新
+		if(isRefresh && isRefresh == 1) return
+		that.loading = true
+		that.utils.checkToken(that,res =>{
+			if(res && res.errno == 0) {
+				that.initData()
+			} else {
+				that.loading = false
+			}
+		})
+	  })
+	
+  },	
+  methods: {
+	// 初始化信息
+	initData() {
+		let that = this;
+		// const start = new Date();
+		// const end = new Date();
+		// start.setTime(start.getTime() - 3600 * 1000 * 24 * 7);
+		// that.dateArr = [start, end]
+		 this.dateArr = ''
+	  	that.loading = true	
+		that.userName = ''
+		that.idCard = ''
+		that.status = 0
+		that.confrereAttr = '1'
+		that.cooperaCls = ''
+		that.data = []
+		that.curPage = 1
+		that.totalPage = null
+		that.getUserList()
+		that.handlePermission()
+	},
+	// 查询
+	search() {
+		// const start = new Date();
+		// const end = new Date();
+		// start.setTime(start.getTime() - 3600 * 1000 * 24 * 7);
+		// this.dateArr = [start, end]
+		this.curPage = 1;
+		this.totalPage = null;
+		this.data = [];
+		this.loading = true;
+		this.getUserList()
+
+		return
+		if(this.lastSearch == this.userName+this.idCard) { // 与上次输入搜索条件相同不走接口
+			if(this.userName || this.idCard) {
+				this.$message.error('请勿重复查询!')
+			} else {
+				this.$message.error('请至少输入一项查询条件!')
+				document.getElementsByClassName("search-con")[0].querySelector('input').focus()
+			}
+		} else { // 与上次输入搜索条件不同
+			if(this.userName || this.idCard) { // 如果之前没有条件查询过 至少要输入一个查询条件
+				if(this.idCard) {
+					let idCardreg = /(^\d{15}$)|(^\d{18}$)|(^\d{17}(\d|X|x)$)/;
+					if (!idCardreg.test(this.idCard)) {
+						this.$message.error('请输入正确的身份证号')
+						document.getElementsByClassName("search-con")[0].querySelectorAll('input')[1].focus()
+						return
+					}
+				}
+				this.curPage = 1;
+				this.totalPage = null;
+				this.data = [];
+				this.loading = true;
+				this.getUserList()
+			} else { // 未填写查询条件
+				if(this.lastSearch) {  // 如果之前有条件查询过 可走接口查询全部
+					this.curPage = 1;
+					this.totalPage = null;
+					this.data = [];
+					this.loading = true;
+					this.getUserList()
+				} else {
+					this.$message.error('请至少输入一项查询条件!')
+					document.getElementsByClassName("search-con")[0].querySelector('input').focus()
+				}
+			}
+		}	
+	},
+	// 关闭显示大图
+	closeImgView() {
+		this.showViewer = false
+		this.showViewImgs = []
+	},
+	// 显示大图
+	showImgView(imgs) {
+		this.showViewer = true
+		this.showViewImgs = imgs
+	},
+	// 切换自然人或者机构
+	handleTabClick(tab) {
+		this.curPage = 1;
+		this.totalPage = null;
+		this.data = [];
+		this.loading = true;
+		this.getUserList()
+	},
+	// 判断当前页面都有什么权限
+	handlePermission() { 
+		let that = this;
+		that.utils.getPermissionList(that,data =>{
+			data.forEach(item =>{
+				if(item.title == '审批') {
+					that.isApprove = true
+				}	
+			})
+		})
+	},
+	// 获取社员列表
+	getUserList() {
+		let that = this
+		that.loading = true
+		that.ajax('userList',{
+			page: that.curPage,
+			size: 10,
+			name: that.userName,
+            idcard: that.idCard,
+			status: that.status,
+			cls: that.confrereAttr,
+			coopera_cls: that.cooperaCls,
+			start_time: this.dateArr ? (this.utils.dateFormat('yyyy-MM-dd',this.dateArr[0]) + ' 00:00:00') : '',
+			end_time: this.dateArr ?  (this.utils.dateFormat('yyyy-MM-dd',this.dateArr[1]) +' 23:59:59') : '',
+		},'获取'+(that.confrereAttr == 1 ? '自然人' :  (that.confrereAttr == 2 ? '机构' : '集体经济组织'))+'列表失败',res =>{
+			that.loading = false
+			if(res.errno == 0) {
+				res.data.data.forEach(item =>{
+					if(item.add_time) {
+						item.add_time = that.utils.dateFormat('yyyy-MM-dd HH:mm:ss', new Date(parseInt(item.add_time)*1000))
+					}
+				})
+				that.data = res.data.data
+				that.curPage = Number(res.data.current_page)
+				that.totalPage = res.data.total
+				that.lastSearch = that.userName+that.idCard
+			}
+		}, err =>{
+			that.loading = false
+		})
+	},
+	// 处理分页
+	handleCurPageChange(val) {
+		this.curPage = val;
+		this.getUserList()
+	},
+	// 处理操作btn
+	handleBtn(status,row,index) {
+		let that = this;
+		if(status == 1) {
+			that.$confirm('是否同意审批?', '提示', {
+          		confirmButtonText: '确定',
+				cancelButtonText: '取消',
+				type: 'warning',
+				center: true
+			}).then(() => {
+				that.handleUserStep(row,index,status,'')
+			}).catch(() => {});
+		} else {
+			that.$prompt('是否'+(status == 1 ? '同意' : '拒绝')+'审批？', '提示', {
+				inputPlaceholder: '请输入拒绝原因',
+				type: 'warning',
+				center: true
+			}).then((data) => {
+				that.handleUserStep(row,index,status,data.value)
+			}).catch(data =>{})
+		}
+		
+	},
+	// 请求社员审批接口
+	handleUserStep(row,index,status,note) {//status 2-拒绝 1-通过
+		let that = this
+		that.ajax('userStep',{
+			user_id: row.user_id,
+			job_id: row.job_id,
+			status: status,
+			note: note,
+		},'社员审批失败',res =>{
+			if(res.errno == 0) {
+				that.data.splice(index,1)
+				that.$message.success((status == 1 ? '审批' : '拒绝' )+ '成功')
+				if(that.data.length === 0){
+					if(that.curPage > 1) {
+						that.curPage = that.curPage-1
+					}
+					that.getUserList()
+				}
+				
+			}
+		})
+	},
+	// 查看详情
+	detail(row) {
+		this.$router.push({
+			path: '/confrereDetail',
+			query: {
+				userId: row.user_id,
+				path: '/confrereApproveList',
+				isApprove: this.isApprove
+			}
+		})
+	}
+
+  }
+};
+</script>
+<style lang="less">
+.confrere-approve-list {
+  padding: 20px;
+  p.title {
+    display: flex;
+    justify-content: space-between;
+	align-items: center;
+	font-weight: bold;
+  }
+  .operate-con {
+	  padding: 10px 0;
+    .search-con {
+	  float: left;
+	  width: 80%;
+	  .el-form-item {
+		width: 35%;
+		float: left;
+		margin-bottom: 0;
+		.el-form-item__label {
+			font-size: 0.9rem;
+		}
+		.el-form-item__content {
+			margin-right: 30px;
+			.el-input {
+			width: 70%;
+			.read-idCard {
+				color: #3B6AF1;
+				background: #F0F8FF;
+				font-size: 0.75rem;
+				cursor: pointer;
+			}
+		}
+		}
+		.el-range-editor {
+			width: 90%;
+		}
+		
+	}
+    }
+    .btn-con {
+      float:right;
+    }
+  }
+	.el-table{
+		background: transparent;
+		.demo-table-expand {
+			font-size: 0;
+			.el-form-item {
+				margin-right: 0;
+				margin-bottom: 0;
+				width: 100%;
+			}
+			label {
+				width: 110px;
+				color: #99a9bf;
+				font-size: 15px;
+			}
+			.el-form-item__content {
+				font-size: 15px;
+			}
+		}
+	}
+	.el-pagination{
+		float: right;
+		margin-top: 30px;
+		margin-bottom: 30px;
+	}
+	
+}
+
+</style>

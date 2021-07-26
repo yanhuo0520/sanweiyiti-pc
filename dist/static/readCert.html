@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        <script type="text/javascript" src="./js/qwebchannel.js"></script>
+        <script type="text/javascript">
+            //BEGIN SETUP
+			//拍照数据（base64）
+			var baseUrl;
+            var socket; 
+            var domain = '172.168.0.48'
+            /**
+            * 获取当前url内指定参数
+            * @param name 要获取的参数名
+            */
+            function getUrlParam(name) { 
+                var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)", "i");
+                var r = window.location.search.substr(1).match(reg);
+                if (r != null) return (r[2]);
+                return null;
+            }
+			//储存图片路径的变量和数组
+			function openSocket() {				
+				socket = new WebSocket(baseUrl);
+                socket.onclose = function()
+                {
+                    console.error("web channel closed");
+                };
+                socket.onerror = function(error)
+                {
+                    console.error("web channel error: " + error);
+                };
+				socket.onopen = function()
+                {
+                    new QWebChannel(socket, function(channel) {
+                        //获取注册的对象
+                        window.dialog = channel.objects.dialog;
+						//网页关闭函数
+						window.onbeforeunload = function() {
+							dialog.get_actionType("closeSignal");
+						}
+						window.onunload = function() {
+							dialog.get_actionType("closeSignal");
+						}
+                        //主摄像头拍照按钮点击
+						document.getElementById("photographPri").onclick = function() {
+							dialog.photoBtnClicked("primaryDev_");
+							dialog.get_actionType("savePhotoPriDev");	
+                        };
+                        //纠偏裁边
+						// document.getElementById("setdeskew").onclick = function() {
+                        //     dialog.get_actionType("setdeskew");	
+						// };
+                       
+						//服务器返回消息
+                        dialog.sendPrintInfo.connect(function(message) {
+							//读取二代证头像返回信息
+							if(message.indexOf("idFaceInfo:") >= 0)
+							{
+								// var value = message.substr(11);
+								// var element = document.getElementById("devPhoto2");
+								// element.src = "data:image/jpg;base64," + value;	
+								// return;
+							}
+							//获取文件base64返回值
+							else if(message.indexOf("fileBase64:") >= 0)
+							{
+								var value = message.substr(11);
+								alert(value);
+								return;
+							}
+						
+                        });
+                        
+						//接收图片流用来展示，多个，较小的base64，副头数据
+						dialog.send_subImgData.connect(function(message) {
+                            var element = document.getElementById("bigPriDev");
+                            element.src = "data:image/jpg;base64," + message;												
+                        });
+                        //接收图片流用来展示，多个，较小的base64，主头数据
+						dialog.send_priImgData.connect(function(message) {
+							var element = document.getElementById("bigPriDev");
+							element.src = "data:image/jpg;base64," + message;
+                        });
+                        
+                        //接收拍照base64，主头数据
+						dialog.send_priPhotoData.connect(function(message) {
+                            window.parent.postMessage({ type: 'data',data: message,path: getUrlParam('path')},'http://coopera.xfd365.com/adminer/index.html#/'+getUrlParam('path'));	
+							// window.parent.postMessage({ type: 'data',data: message,path: getUrlParam('path')},'http://'+domain+':8080/#/'+getUrlParam('path'));
+                        });
+						//网页加载完成信号
+                        dialog.html_loaded("faceDetect_two");
+                        setTimeout(() =>{
+                            dialog.get_actionType("closeSubVideo");	
+                            dialog.get_actionType("setdeskew")
+                            //设置副摄像头拍照尺寸
+                            //第四个参数如果为空则会设置指定的长宽；如果不为空则把视频大小改为正常大小
+                            // dialog.get_functionTypes("setScanSizeSub", "310", "450", "");
+                        })
+                    });
+                }
+			}
+			//网页初始化函数
+            window.onload = function() {
+				baseUrl = "ws://127.0.0.1:12345";			  
+				openSocket();  
+            }
+            //END SETUP
+        </script>
+        <style type="text/css">
+            html {
+                height: 100%;
+                width: 100%;
+                overflow-x:hidden
+            }
+            button { outline: none; cursor: pointer; outline: none;}
+            button:active { opacity: 0.6; }
+            .info {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-direction: column;
+            }
+            .info .tit {
+                font-weight: bold;
+                font-size: 16px;
+                padding: 12px;
+                width: 100%;
+                display: flex;
+                align-items: center;
+                
+            }
+            .info .tit span {
+                flex: 1;
+                text-align: center;
+            }
+            .info .tit img {
+                width: 20px;
+                height: 20px;
+                cursor: pointer;
+            }
+            .btn-con {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            #photographPri {
+                width: 120px;
+                height: 40px;
+                margin: 0;
+                padding: 0;
+                color: #fff;
+                background-color: #3a8ee6;
+                border: 1px solid #3a8ee6;
+                border-radius: 1000px;
+                cursor: pointer;
+            }
+            #setdeskew {
+                width: 120px;
+                height: 40px;
+                margin: 0;
+                padding: 0;
+                color: #fff;
+                background-color: #3a8ee6;
+                border: 1px solid #3a8ee6;
+                border-radius: 1000px;
+                cursor: pointer;
+                margin-right: 20px;
+            }
+            #bigPriDev {
+                padding-top: 10px;
+                padding-bottom: 30px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="info">
+            <div class="tit">
+                <span id="tit">身份证识别</span>
+                <img id="closeBtn" src="./img/iframe-close.png" alt="">
+            </div>
+            <img id="bigPriDev" src="./img/default-photo.png" width="290" height="190"  /></img>	
+            <div class="btn-con">
+                <!-- <button id="setdeskew" >纠偏裁边</button> -->
+                <button id="photographPri" >识别</button>	
+            </div>
+        </div>
+    </body>
+    <script>
+         if(getUrlParam('path') == 'addConfrereread') {
+            document.getElementById('tit').innerHTML = '自然人身份证识别'
+        } else if (getUrlParam('path') == 'addConfrereLicenseread') {
+            document.getElementById('tit').innerHTML = '法人身份证正面上传'
+            document.getElementById('photographPri').innerHTML = '拍照'
+        }else if (getUrlParam('path') == 'addConfrereZread') {
+            document.getElementById('tit').innerHTML = '自然人身份证识别'
+            document.getElementById('photographPri').innerHTML = '识别'
+        }else if (getUrlParam('path') == 'addConfrereFread') {
+            document.getElementById('tit').innerHTML = '自然人身份证反面上传'
+            document.getElementById('photographPri').innerHTML = '拍照'
+        }else if (getUrlParam('path') == 'addConfrereLicenseFread') {
+            document.getElementById('tit').innerHTML = '法人身份证反面上传'
+            document.getElementById('photographPri').innerHTML = '拍照'
+        }else if (getUrlParam('path') == 'confrereDetailLicenseFread') {
+            document.getElementById('tit').innerHTML = '法人身份证反面上传'
+            document.getElementById('photographPri').innerHTML = '拍照'
+        }else if (getUrlParam('path') == 'confrereDetailLicenseread') {
+            document.getElementById('tit').innerHTML = '法人身份证正面上传'
+            document.getElementById('photographPri').innerHTML = '拍照'
+        }else if (getUrlParam('path') == 'addConfrereOrgread') {
+            document.getElementById('tit').innerHTML = '法人身份证正面上传'
+            document.getElementById('photographPri').innerHTML = '拍照'
+        }else if (getUrlParam('path') == 'addConfrereOrgFread') {
+            document.getElementById('tit').innerHTML = '法人身份证反面上传'
+            document.getElementById('photographPri').innerHTML = '拍照'
+        }else if (getUrlParam('path') == 'confrereDetailOrgread') {
+            document.getElementById('tit').innerHTML = '法人身份证正面上传'
+            document.getElementById('photographPri').innerHTML = '拍照'
+        }else if (getUrlParam('path') == 'confrereDetailOrgFread') {
+            document.getElementById('tit').innerHTML = '法人身份证反面上传'
+            document.getElementById('photographPri').innerHTML = '拍照'
+        }
+        
+        //点击关闭图标按钮
+        document.getElementById("closeBtn").onclick = function() {
+            window.parent.postMessage({ type: 'close',path: getUrlParam('path')},'http://coopera.xfd365.com/adminer/index.html#/'+getUrlParam('path'));
+            // window.parent.postMessage({ type: 'close',path: getUrlParam('path') },'http://'+domain+':8080/#/'+getUrlParam('path'));
+        };
+    </script>
+</html>

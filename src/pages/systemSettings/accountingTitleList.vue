@@ -1,0 +1,1008 @@
+<template>
+    <div class="accounting-title-list"  v-loading="loading">
+		<div class="breadcrumb-con">
+			<img class="left-icon" src="../../images/breadcrumb-left-icon.png" alt="">
+			<div class="breadcrumb-info">
+				<el-breadcrumb separator-class="el-icon-arrow-right">
+					<el-breadcrumb-item>系统配置</el-breadcrumb-item>
+					<el-breadcrumb-item  class="breadcrumb-tit">科目配置</el-breadcrumb-item>
+				</el-breadcrumb>
+			</div>
+			<el-button size="small" @click="initData()">刷新</el-button>
+		</div>
+		<div class="operate-con clearfix">
+			<div class="search-con">
+				<el-form class="clearfix"  label-width="100px">
+					<el-form-item label="子级科目名称">
+						<el-input v-model="searchName" placeholder="请输入子级科目名称" clearable @clear="search()" @keyup.enter.native="search()" @input="bindInput" ></el-input>
+					</el-form-item>
+					<el-button type="primary" size="small" :loading="loading" @click="search()">{{loading ? '获取数据中...' : '查询'}}</el-button>
+				</el-form>
+			</div>
+		</div>
+        <div class="table-con">
+            <template v-if="searchName">
+                <template v-if="searchData && searchData.length > 0">
+                    <el-table :data="searchData" border >
+                        <el-table-column prop="id" label="ID" width="60px"></el-table-column>
+                        <el-table-column prop="title" label="科目名称" ></el-table-column>
+                        <el-table-column prop="code" label="科目编号" ></el-table-column>
+                         <el-table-column prop="level" label="科目级别" ></el-table-column>
+                        <el-table-column  label="所属科目" align="center" >
+                            <template slot-scope="scope">
+                                <el-breadcrumb separator-class="el-icon-arrow-right">
+                                    <el-breadcrumb-item v-for="(item,index) in scope.row.pdata" :key="index"  >{{item && item.title ? item.title : ''}}</el-breadcrumb-item>
+                                </el-breadcrumb>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="type" label="科目类别" ></el-table-column>
+                    </el-table>
+                </template>
+                <template v-if="!searchData || searchData.length == 0">
+                    <div class="no-data-con" >
+                        <div class="absolute-center">
+                            <div class="err-info-text ">暂无搜索结果</div>
+                        </div>
+                    </div>
+                </template>
+            </template>
+            <template v-else>
+                <template v-if="data && data.length > 0">
+                    <div class="add-edit-con">
+                        
+                        <div class="left-con">
+                            <div class="btn-con" v-if="isEdit || isAdd || isDel" :class="{'disabled': !selectInfo}">
+                                <el-button v-if="isEdit"  size="small" plain @click="editSelect" :class="{'edit-btn': selectInfo && (!selectInfo.level || selectInfo.level == 1)}">编辑</el-button>
+                                <el-button v-if="isAdd" type="primary" size="small" plain @click="addChild">添加子级</el-button>
+                                <el-button v-if="isDel" type="danger" size="small" plain @click="delSelect" :class="{'edit-btn': selectInfo && (!selectInfo.level || selectInfo.level == 1)}">删除</el-button>
+                            </div>
+                            <!-- <el-scrollbar  wrap-class="scrollbar-wrapper" id="subjectScroll"> -->
+                            <div id="subjectScroll">
+                                <div class="column-start-center basic_layer" v-for="(item,index) in data" :key="index">
+                                    <div class="row-flex-start basic_banner">
+                                        <div class="reTree_icon" :style="{height: (size||14*1.2 )+'px',width: (size||14*1.2) +'px'}" :class="{
+                                            'reTree_default_icon': item.children.length===0,
+                                            'reTree_collapse_icon': item.expand && item.children.length>0,
+                                            'reTree_expand_icon': !item.expand && item.children.length>0,
+                                            }" @click="itemClick(item)"></div>
+                                        <div class="layer_text nowrap" :class="{
+                                            'bg_color': item.isSelect,
+                                            }" @click="addEditItem(item,index)">{{item.label}}</div>
+                                    </div>
+                                    <tree-item v-if="item.expand&&item.children.length>0" v-on="$listeners" :list="item.children" :size="size"></tree-item>
+                                </div>
+                            </div>
+                            <!-- </el-scrollbar> -->
+                        </div>
+                        <div class="right-con">
+                            <el-scrollbar  wrap-class="scrollbar-wrapper">
+                                <div class="subject-detail" v-if="selectInfo">
+                                    <el-form ref="ruleForm" :model="ruleForm"  style="margin-top: 0.5rem" label-width="100px">
+                                        <div class="tit-con">
+                                            <div class="shu"></div>
+                                            <span class="tit">【{{selectInfo.title}}】{{btnType == 1 ? '编辑' : (btnType == 2 ? '添加' : '详情')}}</span>
+                                            <div class="bg"></div>
+                                        </div>
+                                        <div class="form-item-con clearfix">
+                                            <div v-show="!btnType || btnType == 3">
+                                                <el-form-item label="科目编码:">
+                                                    <el-input v-model="selectInfo.code"  readonly></el-input>
+                                                </el-form-item>
+                                                <el-form-item label="科目名称:">
+                                                    <el-input v-model="selectInfo.title" readonly ></el-input>
+                                                </el-form-item>
+                                                <el-form-item label="科目类型:">
+                                                    <el-input v-model="selectInfo.type"  readonly></el-input>
+                                                </el-form-item>
+                                                <el-form-item label="科目等级:">
+                                                    <el-input v-model="selectInfo.levelText" readonly></el-input>
+                                                </el-form-item>
+                                                <el-form-item label="使用说明:" v-if="selectInfo.level && selectInfo.level > 1">
+                                                    <el-input v-model="selectInfo.note" readonly></el-input>
+                                                </el-form-item>
+                                            </div>
+                                            <div v-show="btnType == 1">
+                                                <!-- <el-form-item label="科目编码:">
+                                                    <el-input v-model="selectInfo.code"  readonly></el-input>
+                                                </el-form-item> -->
+                                                <el-form-item label="科目名称:" prop="title" :rules="{ required: true, message: '请输入科目名称', trigger: 'blur' }">
+                                                    <el-input v-model="ruleForm.title"  id="subjectEditTit" ></el-input>
+                                                </el-form-item>
+                                                <!-- <el-form-item label="科目类型:">
+                                                    <el-input v-model="selectInfo.type"  readonly></el-input>
+                                                </el-form-item>
+                                                <el-form-item label="科目等级:">
+                                                    <el-input v-model="selectInfo.levelText" readonly></el-input>
+                                                </el-form-item> -->
+                                                <el-form-item label="使用说明:" >
+                                                    <el-input v-model="ruleForm.note" ></el-input>
+                                                </el-form-item>
+                                            </div>
+                                            <div v-show="btnType == 2">
+                                                <el-form-item label="父级科目:" v-if="selectInfo.level && selectInfo.level > 1">
+                                                    <el-input v-model="selectInfo.title"  readonly></el-input>
+                                                </el-form-item>
+                                                <el-form-item label="科目名称:" prop="title" :rules="{required: true, message: '请输入要添加的科目名称', trigger: 'blur'}">
+                                                    <el-input v-model="ruleForm.title" id="subjectAddTit" ></el-input>
+                                                </el-form-item>
+                                                <el-form-item label="使用说明:" >
+                                                    <el-input v-model="ruleForm.note" ></el-input>
+                                                </el-form-item>
+                                            </div>
+                                        </div>
+                                    </el-form>
+                                </div>
+                                <div class="btn-con" v-if="btnType">
+                                    <el-button  size="small" type="primary" @click="saveSelectInfo(btnType)">保存</el-button>
+                                </div>  
+                            </el-scrollbar>
+                        </div>
+                    </div>
+                </template>
+                <template v-if="!data || data.length == 0">
+                    <div class="no-data-con" >
+                        <div class="absolute-center">
+                            <div class="err-info-text ">暂无科目列表</div>
+                        </div>
+                    </div>
+                </template>
+            </template>
+            <el-pagination @current-change="handleCurPageChange" v-if="totalPage && totalPage > 0" background :current-page="curPage" layout="prev, pager, next" :total="totalPage*10"> </el-pagination>
+        </div>
+    </div>
+</template>
+<script>
+import treeItem from "../../components/treeItem.vue";
+export default {
+  name: "accountingTitleList",
+  data() {
+    return {
+        inheritAttrs: false,
+        props: {
+            pd: {},
+            size: {
+            type: Number,
+            default: 14
+            }
+        },
+
+	  searchName: '',
+      lastSearch: '',
+      curPage: 1,
+      totalPage: null,
+      data: [],
+      ruleForm: {
+          title: '',
+          note: '',
+      },
+      loading: false,
+      submitLoading: false,
+
+      searchData: [],// 搜索结果
+      
+	  isEdit: false,// 是否有编辑权限
+      isDel: false, //是否有删除权限
+      isAdd: false, //是否有添加权限
+
+      selectedDetail: {},
+      timer: {},
+      size: 16,
+
+      lastSelectInfo: null, // 上次选中的科目信息
+      selectInfo: null, //当前选中的科目信息
+
+      isSelectEdit: false, //编辑选择的科目
+      isSelectAdd: false, //添加子级
+      btnType: null, // 1-编辑 2-添加
+    //   formatData: []
+    };
+  },
+  components: { treeItem },
+  created() {
+      eventWatch.$on('itemClick',item =>{
+            this.getData(item,data =>{
+                let tmpArr = JSON.parse(JSON.stringify(data))
+                 tmpArr.forEach(subItem =>{
+                   subItem.setIndexArr = item.setIndexArr.concat(subItem.setIndexArr)
+                })
+                item.children = tmpArr
+                item.expand = !item.expand
+            })
+      })
+       eventWatch.$on('editItem',item =>{
+            this.$set(item,'isSelect',true)
+            if(this.selectInfo && (this.selectInfo && this.selectInfo.code != item.code)) {
+                this.lastSelectInfo = this.selectInfo
+                this.lastSelectInfo.isSelect = false
+            }
+            this.selectInfo = item
+            this.btnType = null
+            this.isSelectEdit = false
+            this.isSelectAdd = false
+      })
+      
+  },
+   watch: {
+    pd(n, o) {
+      this.data = this.preDealData(n);
+    }
+  },
+  activated() {
+	  this.initData()
+    //   this.preDealData(this.pd)
+  },	
+  methods: {
+     preDealData(list) {
+        if(list && list.length > 0) {
+            list.forEach(x => {
+                if (!x.expand) this.$set(x, "expand", false);
+                if (x.children && x.children.length > 0) this.preDealData(x.children);
+            });
+        }
+        return list;
+        },
+        // 根据id展开树的具体项
+        expandTreeItemById(idList) {
+        let _this = this;
+        function loopTree(list) {
+            list.forEach(x => {
+            if (idList.includes(x.id)) {
+                _this.$set(x, "expand", true);
+            } else {
+                _this.$set(x, "expand", false);
+            }
+            if (x.children && x.children.length > 0) loopTree(x.children);
+            });
+            return list;
+        }
+        this.data = loopTree(this.pd);
+        },
+        // 展开子级
+        itemClick(item){
+            eventWatch.$emit('itemClick',item)
+        },
+        // 点击编辑或者添加子级
+        addEditItem(item,index) {
+            eventWatch.$emit('editItem',item)
+            // this.$set(item,'isSelect',true)
+        },
+        // 详情点击
+        // detailClick(data) {
+        //     clearTimeout(this.timer);
+        //     this.timer = setTimeout(() => {
+        //         this.selectedDetail = data;
+        //         this.$emit("detailClick", data);
+        //     }, 300);
+        // },
+        // detailDoubleClick(data) {
+        //     clearTimeout(this.timer);
+        //     this.selectedDetail = data;
+        //     this.$emit("detailDoubleClick", data);
+        // },
+        // 删除选择科目
+        delSelect() {
+            let selectInfo = this.selectInfo
+            if(selectInfo) {
+                if(!selectInfo.level || selectInfo.level == 1) {
+                    this.$message.error('一级科目禁止删除')
+                    return
+                }
+                if(selectInfo.count > 0) {
+                    this.$message.error('请先删除子级科目')
+                    return
+                }
+                this.$confirm('此操作将永久删除该科目, 是否继续?', '提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning',
+                    center: true
+                }).then(() => {
+                    this.isSelectEdit = false
+                    this.isSelectAdd = false
+                    this.btnType = 3
+                    this.delApi()
+                }).catch(() => { });
+            } else {
+                this.$message.error('请先选择要删除的科目')
+            }
+        },
+        // 请求删除api
+        delApi() {
+            let that = this
+            that.submitLoading = true
+            that.ajax('accountingTitleDel',{id: that.selectInfo.id},'删除科目失败',res =>{
+                that.submitLoading = false
+                if(res.errno == 0) {
+                    that.$message.success('删除科目成功')
+                    // 技术有限 删除无法解决视图正确渲染问题,目前手动判断15级之内的数据可正常渲染
+                    let tmpIndexArr = that.selectInfo.setIndexArr
+                    let tmpData = []
+                    if(tmpIndexArr.length == 2) {
+                        tmpData = that.data[tmpIndexArr[0]]
+                    }
+                    if(tmpIndexArr.length == 3) {
+                        tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]]
+                    }
+                    if(tmpIndexArr.length == 4) {
+                        tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]]
+                    }
+                    if(tmpIndexArr.length == 5) {
+                        tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]]
+                    }
+                    if(tmpIndexArr.length == 6) {
+                        tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]].children[tmpIndexArr[4]]
+                    }
+                    if(tmpIndexArr.length == 7) {
+                        tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]].children[tmpIndexArr[4]].children[tmpIndexArr[5]]
+                    }
+                    if(tmpIndexArr.length == 8) {
+                        tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]].children[tmpIndexArr[4]].children[tmpIndexArr[5]].children[tmpIndexArr[6]]
+                    }
+                    if(tmpIndexArr.length == 9) {
+                        tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]].children[tmpIndexArr[4]].children[tmpIndexArr[5]].children[tmpIndexArr[6]].children[tmpIndexArr[7]]
+                    }
+                    if(tmpIndexArr.length == 10) {
+                        tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]].children[tmpIndexArr[4]].children[tmpIndexArr[5]].children[tmpIndexArr[6]].children[tmpIndexArr[7]].children[tmpIndexArr[8]]
+                    }
+                    if(tmpIndexArr.length == 11) {
+                        tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]].children[tmpIndexArr[4]].children[tmpIndexArr[5]].children[tmpIndexArr[6]].children[tmpIndexArr[7]].children[tmpIndexArr[8]].children[tmpIndexArr[9]]
+                    }
+
+                    if(tmpIndexArr.length == 12) {
+                        tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]].children[tmpIndexArr[4]].children[tmpIndexArr[5]].children[tmpIndexArr[6]].children[tmpIndexArr[7]].children[tmpIndexArr[8]].children[tmpIndexArr[9]].children[tmpIndexArr[10]]
+                    }
+                    if(tmpIndexArr.length == 13) {
+                        tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]].children[tmpIndexArr[4]].children[tmpIndexArr[5]].children[tmpIndexArr[6]].children[tmpIndexArr[7]].children[tmpIndexArr[8]].children[tmpIndexArr[9]].children[tmpIndexArr[10]].children[tmpIndexArr[11]]
+                    }
+                    if(tmpIndexArr.length == 14) {
+                        tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]].children[tmpIndexArr[4]].children[tmpIndexArr[5]].children[tmpIndexArr[6]].children[tmpIndexArr[7]].children[tmpIndexArr[8]].children[tmpIndexArr[9]].children[tmpIndexArr[10]].children[tmpIndexArr[11]].children[tmpIndexArr[12]]
+                    }
+                    if(tmpIndexArr.length == 15) {
+                        tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]].children[tmpIndexArr[4]].children[tmpIndexArr[5]].children[tmpIndexArr[6]].children[tmpIndexArr[7]].children[tmpIndexArr[8]].children[tmpIndexArr[9]].children[tmpIndexArr[10]].children[tmpIndexArr[11]].children[tmpIndexArr[12]].children[tmpIndexArr[13]]
+                    }
+                    tmpData.expand = false
+                    eventWatch.$emit('itemClick',tmpData)
+                }
+            }, err =>{
+                that.submitLoading = false
+            })
+        },
+        // 修改选择科目
+        editSelect() {
+            let selectInfo = this.selectInfo
+            if(selectInfo) {
+                if(!selectInfo.level || selectInfo.level == 1) {
+                    this.$message.error('一级科目禁止编辑')
+                    return
+                }
+                this.isSelectEdit = true
+                this.isSelectAdd = false
+                this.ruleForm.title = selectInfo.title
+                this.ruleForm.note = selectInfo.note
+                this.btnType = 1
+                setTimeout(() =>{
+                    document.querySelector('#subjectEditTit').focus()
+                })
+            } else {
+                this.$message.error('请先选择要编辑的科目')
+            }
+        },
+        // 添加当前科目子级
+        addChild() {
+            let selectInfo = JSON.parse(JSON.stringify(this.selectInfo))
+            if(selectInfo) {
+                this.isSelectEdit = false
+                this.isSelectAdd = true
+                this.ruleForm.title = ''
+                this.ruleForm.note = ''
+                this.btnType = 2
+                setTimeout(() =>{
+                    document.querySelector('#subjectAddTit').focus()
+                })
+            } else {
+                this.$message.error('请先选择要编辑的科目')
+            }
+        },
+        //保存信息
+        saveSelectInfo(type) { //type 1-提交编辑 2-提交添加信息
+            let that = this
+            let selectData = JSON.parse(JSON.stringify(this.selectInfo))
+            let params = {}
+            that.$refs['ruleForm'].validate((valid) => {
+                if (valid) {
+                    if(type == 1) {
+                        params = {
+                            p_code: this.selectInfo.p_code,
+                           title: this.ruleForm.title,
+                           id: this.selectInfo.id,
+                           level: this.selectInfo.level,
+                           note: this.ruleForm.note,
+                           type: this.selectInfo.type,
+                        }
+                    } else if (type == 2) {
+                        params = {
+                           title: this.ruleForm.title,
+                           p_code: this.selectInfo.code,
+                           id: '',
+                           level: this.selectInfo.level + 1,
+                           note:this.ruleForm.note,
+                           type: this.selectInfo.type,
+                        }
+                    }
+                    // function handleTree(list) {
+                    //     if(list && list.length > 0) {
+                    //         list.forEach((item,index) =>{
+                    //             if(item.code == that.selectInfo.code) {
+                    //                 that.$set(item,'title', that.ruleForm.title)
+                    //             }
+                    //             if(item.children && item.children.length > 0) {
+                    //                 handleTree(item.children)
+                    //             }
+                    //         })
+                    //     }
+                    //     return list
+                    // }
+                    // this.data = handleTree(this.data)
+                    that.submitLoading = true
+                    that.ajax('accountingTitleAdd',params,(params.id ? '修改' : '添加')+ '科目失败',res =>{
+                        that.submitLoading = false
+                        if(res.errno == 0) {
+                            that.$message.success((params.id ? '修改' : '添加') +'科目成功')
+                            // let tmpIndexArr = that.selectInfo.setIndexArr
+                            // tmpIndexArr.forEach((item,index) =>{
+                            //      function handleTree(list) {
+                            //         if(list && list.length > 0) {
+                            //             list.forEach((subItem,subIndex) =>{
+                            //                 if(item == subIndex) {
+                            //                     return
+                            //                 }
+                            //                 if(subItem.children && subItem.children.length > 0) {
+                            //                     handleTree(subItem.children)
+                            //                 }
+                            //             })
+                            //         }
+                            //         return list
+                            //     }
+                            // })
+                            if(type == 1) {
+                                that.selectInfo.title = that.ruleForm.title
+                                // 技术有限 编辑无法解决视图正确渲染问题,目前手动判断15级之内的数据可正常渲染
+                                let tmpIndexArr = that.selectInfo.setIndexArr
+                                let tmpData = []
+                                if(tmpIndexArr.length == 2) {
+                                    tmpData = that.data[tmpIndexArr[0]]
+                                }
+                                if(tmpIndexArr.length == 3) {
+                                   tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]]
+                                }
+                                if(tmpIndexArr.length == 4) {
+                                    tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]]
+                                }
+                                if(tmpIndexArr.length == 5) {
+                                   tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]]
+                                }
+                                if(tmpIndexArr.length == 6) {
+                                    tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]].children[tmpIndexArr[4]]
+                                }
+                                if(tmpIndexArr.length == 7) {
+                                    tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]].children[tmpIndexArr[4]].children[tmpIndexArr[5]]
+                                }
+                                if(tmpIndexArr.length == 8) {
+                                    tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]].children[tmpIndexArr[4]].children[tmpIndexArr[5]].children[tmpIndexArr[6]]
+                                }
+                                if(tmpIndexArr.length == 9) {
+                                    tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]].children[tmpIndexArr[4]].children[tmpIndexArr[5]].children[tmpIndexArr[6]].children[tmpIndexArr[7]]
+                                }
+                                if(tmpIndexArr.length == 10) {
+                                    tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]].children[tmpIndexArr[4]].children[tmpIndexArr[5]].children[tmpIndexArr[6]].children[tmpIndexArr[7]].children[tmpIndexArr[8]]
+                                }
+                                if(tmpIndexArr.length == 11) {
+                                    tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]].children[tmpIndexArr[4]].children[tmpIndexArr[5]].children[tmpIndexArr[6]].children[tmpIndexArr[7]].children[tmpIndexArr[8]].children[tmpIndexArr[9]]
+                                }
+
+                                if(tmpIndexArr.length == 12) {
+                                    tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]].children[tmpIndexArr[4]].children[tmpIndexArr[5]].children[tmpIndexArr[6]].children[tmpIndexArr[7]].children[tmpIndexArr[8]].children[tmpIndexArr[9]].children[tmpIndexArr[10]]
+                                }
+                                if(tmpIndexArr.length == 13) {
+                                    tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]].children[tmpIndexArr[4]].children[tmpIndexArr[5]].children[tmpIndexArr[6]].children[tmpIndexArr[7]].children[tmpIndexArr[8]].children[tmpIndexArr[9]].children[tmpIndexArr[10]].children[tmpIndexArr[11]]
+                                }
+                                if(tmpIndexArr.length == 14) {
+                                    tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]].children[tmpIndexArr[4]].children[tmpIndexArr[5]].children[tmpIndexArr[6]].children[tmpIndexArr[7]].children[tmpIndexArr[8]].children[tmpIndexArr[9]].children[tmpIndexArr[10]].children[tmpIndexArr[11]].children[tmpIndexArr[12]]
+                                }
+                                if(tmpIndexArr.length == 15) {
+                                    tmpData = that.data[tmpIndexArr[0]].children[tmpIndexArr[1]].children[tmpIndexArr[2]].children[tmpIndexArr[3]].children[tmpIndexArr[4]].children[tmpIndexArr[5]].children[tmpIndexArr[6]].children[tmpIndexArr[7]].children[tmpIndexArr[8]].children[tmpIndexArr[9]].children[tmpIndexArr[10]].children[tmpIndexArr[11]].children[tmpIndexArr[12]].children[tmpIndexArr[13]]
+                                }
+                                tmpData.expand = false
+                                eventWatch.$emit('itemClick',tmpData)
+                            } else if(type == 2) {
+                                this.selectInfo.expand = false
+                                eventWatch.$emit('itemClick',this.selectInfo)
+                            }
+                        }
+                    }, err =>{
+                        that.submitLoading = false
+                    })
+                } else {
+                    setTimeout(()=>{
+                        let isError= document.getElementsByClassName("is-error");
+                        let firstErrInput = isError[0].querySelector('input')
+                        firstErrInput.focus();
+                    },100);
+                    return false;
+                }
+            });
+        },
+	// 初始化信息
+	initData() {
+      this.selectInfo = null
+      this.searchName = '';
+      this.curPage = 1;
+      this.totalPage = null;
+      this.submitLoading = false;
+      this.data = [];
+      this.selectInfo = null
+      this.getData('',data => {
+          this.data = data
+      })
+	  this.handlePermission()
+	},
+	// 查询
+	search() {
+        this.curPage = 1;
+        this.totalPage = null;
+        this.data = [];
+        if(this.searchName) {
+            this.getSearchData()
+        } else {
+            this.selectInfo = null
+            this.getData('',data => {
+                this.data = data
+            })
+        }
+    },
+    bindInput(val) {
+       this.searchData = []
+    },
+    // 获取搜索数据
+    getSearchData() {
+        let that = this
+        if(that.loading) return
+        that.loading = true
+		that.ajax('accountingTitleSearch',{
+            title: that.searchName
+        },'搜索科目失败',res =>{
+			that.loading = false
+			if(res.errno == 0) {
+                that.searchData = res.data.data
+                that.curPage = Number(res.data.current_page)
+                that.totalPage = res.data.total
+			} 
+		}, err =>{
+            that.loading = false
+		})
+    },
+     // 处理分页
+	handleCurPageChange(val) {
+		this.curPage = val;
+		this.getSearchData()
+	},
+	// 判断当前页面都有什么权限
+	handlePermission() { 
+		let that = this;
+		that.utils.getPermissionList(that,data =>{
+			data.forEach(item =>{
+				if(item.title == '编辑') {
+					that.isEdit = true
+                }	
+                if(item.title == '删除') {
+					that.isDel = true
+                }	
+                if(item.title == '添加') {
+					that.isAdd = true
+				}	
+			})
+		})
+    }, 
+    // 获取科目列表
+    getData(row,callBack) {
+		let that = this
+        that.loading = true;
+        let params = {}
+        if(row) {
+            params.code = row.code
+        } else {
+            params.level = 1
+        }
+		that.ajax('accountingTitleList',params,'获取科目列表失败',res =>{
+			that.loading = false
+			if(res.errno == 0) {
+               if(res.data && res.data.length > 0) {
+                    res.data.forEach((item,index) =>{
+                        item.label = item.title
+                        item.level = item.level ? item.level : 1
+                        item.levelText = that.utils.noToChinese(item.level) + '级科目'
+                        item.setIndexArr = []
+                        item.setIndexArr.push(index)
+                        if(item.count > 0) {
+                            item.children = [{}]
+                        } else {
+                            item.children = []
+                        }
+                    })
+                    callBack && typeof callBack == 'function' && callBack(res.data)
+               }
+			}
+		}, err =>{
+            that.loading = false
+		})
+    },
+  }
+};
+</script>
+<style lang="less">
+.accounting-title-list {
+  padding: 20px;
+  .el-pagination{
+        float: right;
+        margin-top: 30px;
+        margin-bottom: 30px;
+	}
+	.operate-con {
+	  padding: 10px 0;
+    .search-con {
+	  float: left;
+	  width: 80%;
+	  .el-form-item {
+		width: 28%;
+		float: left;
+		margin-bottom: 0;
+		.el-form-item__label {
+			font-size: 0.9rem;
+		}
+		.el-form-item__content {
+			margin-right: 30px;
+			.el-input {
+			width: 100%;
+			.read-idCard {
+				color: #3B6AF1;
+				background: #F0F8FF;
+				font-size: 0.75rem;
+				cursor: pointer;
+			}
+		}
+		}
+		
+	}
+    }
+    .btn-con {
+      float:right;
+    }
+  }
+    .table-con {
+		.inner-table-tit-con {
+			display: flex;
+			align-content: center;
+			justify-content: space-between;
+			.inner-table-tit {
+				flex: 1;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-weight: bold;
+				font-size: 1.2rem;
+				padding-bottom: 1.25rem;
+				text-align: center;
+				.btn-con {
+					display: flex;
+					align-items: center;
+					justify-content: center;
+				}
+            }
+           
+		}	
+        
+        .inner-table {
+            thead {
+                tr th{
+                    background: #f9f9f9!important;
+                }
+            }
+        }
+        .add-edit-con {
+            width: 100%;
+            height: calc(100vh - 21rem);
+            display: flex;
+
+            
+            .left-con {                
+                width: 20%;
+                height: 100%;
+                .btn-con {
+                    width: 100%;
+                    height: 50px;
+                    display: flex;
+                    align-items: center;    
+                    .edit-btn {
+                        opacity: 0.6;
+                    }
+                }
+                .disabled {
+                    .el-button {
+                        opacity: 0.6;
+                    }
+                }
+                #subjectScroll {
+                    height: calc(100% - 50px);
+                    overflow: auto;
+                }
+                #subjectScroll::-webkit-scrollbar {/*滚动条整体样式*/
+                    width: 6px;     /*高宽分别对应横竖滚动条的尺寸*/
+                    height: 8px;
+                    border-radius: 100px;
+
+                }
+                #subjectScroll::-webkit-scrollbar-thumb {/*滚动条里面小方块*/
+                    border-radius: 100px;
+                    background: rgba(94, 92, 92, 0.2);
+                }
+                #subjectScroll::-webkit-scrollbar-track {/*滚动条里面轨道*/
+                    // -webkit-box-shadow: inset 0 0 5px rgba(0,0,0,0.2);
+                    // border-radius: 0;
+                    // background: rgba(0,0,0,0.1);
+                }
+
+            }
+            
+            .right-con {
+                width: 80%;
+                height: 100%;
+                padding-left: 10px;
+                .subject-detail {
+                    .tit-con {
+                        width: 100%;
+                        display: flex;
+                        align-items: center;
+                        position: relative;
+                        padding-bottom: 15px;
+                        .shu {
+                            width: 0.28rem;
+                            height: 1rem;
+                            background-color: #3B6AF1;
+                        }
+                        .tit {
+                            color: #444444;
+                            padding: 0 0.8rem;
+                            line-height: 1rem;
+                        }
+                        .bg {
+                            flex: 1;
+                            background: url('../../images/baseInfo/tit-bg.png');
+                            height: 1rem;
+                            background-size: 100% 100%;
+                        }
+                    }
+                    .form-item-con {
+                        margin: 2rem 0;
+                        position: relative;
+                        .el-form-item {
+                            width: 35%;
+                            float: left;
+                            height: 2.5rem;
+                            .el-form-item__label {
+                                font-size: 0.9rem;
+                            }
+                            .el-input {
+                                width: 80%;
+                                .read-idCard {
+                                    color: #3B6AF1;
+                                    background: #F0F8FF;
+                                    font-size: 0.75rem;
+                                    cursor: pointer;
+                                }
+                                .read-idCard:active {
+                                    opacity: 0.6;
+                                }
+                            }
+                        }
+                    }
+                   
+                }
+                .btn-con {
+                    display: flex;
+                    align-content: center;
+                    justify-content: center;
+                    padding-right: 30%;
+                }
+                
+            }
+        }
+        
+    }
+    .el-tree-node__content {
+        height: auto;
+    }
+    // .custom-tree-node {
+    //     display: flex;
+    //     align-items: center;
+    //     background: #f5f7fa;
+    //     padding: 10px 20px;
+    //     border-radius: 5px;
+    //     margin-bottom: 10px;
+    //     // min-height: 50px;
+    //     .tit {
+    //         font-weight: bold;
+    //         font-size: 0.9rem;
+    //     }
+    //     .btn-con {
+    //         margin-left: 50px;
+    //         display: flex;
+    //         align-items: center;
+    //     }
+    // }
+    .el-dialog {
+        width: 40%;
+		.el-form {
+			padding: 0 2rem;
+			.el-form-item__content {
+				.el-select {
+					.el-input {
+						width: 100%;
+					}
+				}
+				.el-input {
+					width: 60%;
+				}
+			}
+		}
+	}
+        // .el-tree-node:focus{
+        //     .el-tree-node__content {
+        //         background-color: transparent;
+        //     }
+        //     .custom-tree-node {
+        //         background: #F0F8FF;
+        //     }
+        // }
+        // .el-tree-node__content:hover {
+        //     background-color: transparent;
+        // }
+        // .custom-tree-node:hover {
+        //     background: #F0F8FF;
+        // }
+
+       .active_color{
+    color: #409EFF ;
+}
+
+.reTree_box {
+  overflow-y: auto;
+}
+.reTree_icon {
+  width: 17px;
+  height: 17px;
+  margin-right: 10px;
+}
+
+.basic_layer {
+  width: 100%;
+  position: relative;
+  color: #606764;
+  cursor: pointer;
+  .layer_text {
+    flex: 1;
+    padding: 10px;
+    border-radius: 4px;
+  }
+  .bg_color {
+    background: #409EFF;
+    color: #fff;
+}
+}
+.first_vertical_line {
+  content: "";
+  position: absolute;
+  width: 1px;
+  left: 6px;
+  top: 17px;
+  background: #c3c5c8;
+}
+.basic_banner {
+  position: relative;
+  width: 100%;
+  min-width: 100px;
+  padding-bottom: 1rem;
+}
+.second_layer {
+  position: relative;
+  width: 100%;
+  cursor: pointer;
+  padding-left: 25px;
+}
+.third_layer {
+  position: relative;
+  padding-bottom: 15px;
+  width: 100%;
+  padding-left: 40px;
+  color: #999999;
+}
+
+.second_layer::before {
+  content: "";
+  position: absolute;
+  height: 1px;
+  width: 16px;
+  left: 9px;
+  top: 20px;
+  background: #c3c5c8;
+}
+.third_layer::before {
+  content: "";
+  position: absolute;
+  height: 1px;
+  width: 20px;
+  left: 9px;
+  top: 9px;
+  background: #c3c5c8;
+}
+
+.linkLine_default::after {
+  content: "";
+  position: absolute;
+  height: 100%;
+  width: 1px;
+  left: 9px;
+  top: 0px;
+  background: #c3c5c8;
+}
+.linkLine_first::after {
+  content: "";
+  position: absolute;
+  /* 为了触顶 */
+  top: -14px;
+  height: calc(100% + 14px);
+  width: 1px;
+  left: 9px;
+  background: #c3c5c8;
+}
+// 上半截
+.linkLine_half_top::after {
+  content: "";
+  position: absolute;
+  height: 47px;
+  top: -27px;
+  width: 1px;
+  left: 9px;
+  background: #c3c5c8;
+}
+.linkLine_last::after {
+  content: "";
+  position: absolute;
+  height: 9px;
+  width: 1px;
+  left: 9px;
+  top: 0px;
+  background: #c3c5c8;
+}
+.reTree_collapse_icon {
+  background: url("../../images/reTree_collapse_.svg") no-repeat center center;
+  background-size: contain;
+}
+
+.reTree_default_icon {
+  background: url("../../images/reTree_default_.svg") no-repeat center center;
+  background-size: contain;
+}
+
+.reTree_expand_icon {
+  background: url("../../images/reTree_expand_.svg") no-repeat center center;
+  background-size: contain;
+}
+
+.reTree_focus_icon {
+  background: url("../../images/reTree_focus_.svg") no-repeat center center;
+  background-size: contain;
+}
+    }
+ 
+
+</style>

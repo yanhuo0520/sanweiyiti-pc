@@ -1,0 +1,430 @@
+<template>
+    <div class="cateList" v-loading="loading">
+        <div class="breadcrumb-con">
+            <img class="left-icon" src="../../../images/breadcrumb-left-icon.png" alt="">
+            <div class="breadcrumb-info">
+                <el-breadcrumb separator-class="el-icon-arrow-right">
+                    <el-breadcrumb-item>合作商城</el-breadcrumb-item>
+                    <el-breadcrumb-item class="breadcrumb-tit">店铺分类列表</el-breadcrumb-item>
+                </el-breadcrumb>
+            </div>
+          <el-button size="small" @click="initData()">刷新</el-button>
+        </div>
+        <div class="operate-con clearfix">
+					<div class="search-con"  >	</div>
+          <div class="btn-con" v-if="!loading">
+            <el-button type="primary" size="small" @click="add">添加分类</el-button>
+          </div>
+				</div>
+        <div class="table-con">
+            <div>
+              <el-table :data="tableData" v-if="tableData && tableData.length > 0" border>
+                <el-table-column prop="cate_id" label="ID" width="70" align="center"></el-table-column>
+                <el-table-column prop="cate_name" label="分类名称" align="center"></el-table-column>
+                <el-table-column prop="assort_name" label="分类图标" align="center">
+                  <template slot-scope="scope">
+                      <img :src="scope.row.icon" alt="" v-if="scope.row.icon">
+                  </template>
+                </el-table-column>
+                <el-table-column prop="cate_code" label="分类编码" align="center"></el-table-column>
+                <el-table-column prop="is_mobile_show" label="是否手机端展示" align="center">
+                  <template slot-scope="scope">
+                      {{scope.row.is_mobile_show==1?'是':'否'}}
+                  </template>
+                </el-table-column>
+                <el-table-column prop="is_recommend" label="是否手机端菜单显示" align="center">
+                  <template slot-scope="scope">
+                      {{scope.row.is_recommend==1?'是':'否'}}
+                  </template>
+                </el-table-column>
+                <el-table-column prop="log_date" label="操作" align="center" width="160">
+                  <template slot-scope="scope">
+                      <el-button type="primary" plain size="small" @click="edit(scope.row.cate_id,scope.row.cate_name,scope.row.icon,scope.row.is_mobile_show,scope.row.is_recommend)" >编辑</el-button>
+                      <el-button type="danger" plain size="small" @click="del(scope.row.cate_id)" >删除</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+              <el-pagination v-if="totalPage && totalPage > 0" background :current-page="curPage" layout="prev, pager, next" :total="totalPage*10" @current-change="handleCurPageChange"> </el-pagination>
+          </div>
+          <div v-if="!tableData || tableData.length == 0">
+              <div class="no-data-con" >
+                  <div class="absolute-center">
+                      <div class="err-info-text ">暂无店铺分类</div>
+                  </div>
+              </div>
+          </div>
+        </div>
+        <el-dialog :title="title" :visible.sync="isCate">
+          <div class="add">
+            <p>
+                商城分类：
+                <el-select v-model="assort_name" placeholder="请选择商城分类" @change="changeAssort">
+                    <el-option v-for="(item,index) in assortOptions" :key="index" :label="item.assort_name" :value="item.assort_name"></el-option>
+                </el-select>
+            </p>
+            
+            <p>
+              店铺分类:
+              <el-input v-model="cate_name" placeholder="请输入店铺分类"></el-input>
+            </p>
+            <p>
+              商品图标:
+              <el-upload  class="avatar-uploader"  action="http://coopera.xfd365.com/user/auth/uploadImg" :show-file-list="false" :on-success="handlePic" :on-error="uploadErr">
+                  <img :src="icon" alt="" v-if="icon">
+                  <i v-else class="el-icon-plus avatar-uploader-icon"></i>
+              </el-upload>
+            </p>
+            <p>
+              手机端显示:
+              <el-radio-group v-model="is_mobile_show">
+                <el-radio :label="1">是</el-radio>
+                <el-radio :label="0">否</el-radio>
+              </el-radio-group>
+            </p>
+            <p>
+              菜单显示:
+              <el-radio-group v-model="is_recommend">
+                <el-radio :label="1">是</el-radio>
+                <el-radio :label="0">否</el-radio>
+              </el-radio-group>
+            </p>
+            <el-button type="primary" :loading="submitLoading" @click="submit">{{submitLoading ? '提交中...' : '确认'}}</el-button>
+          </div>
+        </el-dialog>
+    </div>
+</template>
+<script>
+export default {
+  name: "cateList",
+  data() {
+    return {
+      tableData: [],
+      curPage: 1,
+      totalPage: null,
+      loading: true,
+
+      isCate: false,
+      title: "添加分类",
+      cate_name: "",
+      icon: "",
+      cate_id: "", //编辑分类时用的
+      submitLoading: false,
+      
+      assort_name:'',
+      assortOptions:[],
+
+      is_mobile_show: 1,
+      is_recommend:1,
+    };
+  },
+  activated() {
+    this.tableData = [];
+    this.curPage = 1;
+    this.totalPage = null;
+    this.loading = true;
+    this.title = "添加分类";
+    this.isCate = false;
+    this.cate_name = "";
+    this.icon = "";
+    this.cate_id = "";
+    this.cateList();
+  },
+  watch:{
+      isCate(newVal,oldVal){
+          if(newVal){
+              // 店铺分类
+            let cooperationInfo = localStorage.getItem('cooperationInfo') ? JSON.parse(localStorage.getItem('cooperationInfo')) : ''
+            this.ajax(
+                "cateList",
+                {
+                table: "assort",
+                coopera_id: cooperationInfo.id,
+                },
+                "",
+                res => {
+                this.loading = false;
+
+                if (res.errno == 0) {
+                    this.assortOptions = res.data;
+                }
+                },
+                err => {
+                this.loading = false;
+                }
+            );
+          }
+      }
+  },
+  methods: {
+    initData() {
+      this.tableData = [];
+      this.curPage = 1;
+      this.tableData = null;
+      this.loading = true;
+      this.title = "添加分类";
+      this.isCate = false;
+      this.cate_name = "";
+      this.icon = "";
+      this.cate_id = "";
+      this.cateList();
+    },
+    // 店铺分类
+    cateList() {
+      let cooperationInfo = localStorage.getItem('cooperationInfo') ? JSON.parse(localStorage.getItem('cooperationInfo')) : ''
+      this.ajax(
+        "cateList",
+        {
+          table: "cate",
+          coopera_id: cooperationInfo.id,
+        },
+        "",
+        res => {
+          this.loading = false;
+          if (res.errno == 0) {
+            
+            this.tableData = res.data;
+          }
+        },
+        err => {
+          this.loading = false;
+        }
+      );
+    },
+    handleCurPageChange(val) {
+      this.curPage = val;
+      this.totalPage = null;
+      this.tableData = []
+      this.cateList();
+    },
+    // 上传视频
+    handlePic(res, file) {
+      if (res.errno == 0) {
+        this.icon = res.data.url;
+        this.$forceUpdate();
+        this.$message("上传成功");
+      }
+    },
+    // 上传图片之前
+    beforeAvatarUpload(file) {
+      const fileType = file.type;
+      const fileSize = file.size / 1024 / 1024 < 10;
+      if (
+        fileType.search("jpg") < 0 &&
+        fileType.search("jpeg") < 0 &&
+        fileType.search("png") < 0 &&
+        fileType.search("JPG") < 0 &&
+        fileType.search("PNG") < 0
+      ) {
+        this.$message.error("图片类型必须是jpeg,jpg,png中的一种");
+        return false;
+      }
+    },
+    // 上传图片失败
+    uploadErr() {
+      this.$message.error("上传图片失败");
+    },
+
+    // 切换商城分类
+    changeAssort(val){
+        this.cate_name = this.assort_name
+    },
+
+    // 添加分类
+    add() {
+      this.isCate = true;
+      this.cate_name = "";
+      this.icon = "";
+      this.title = "添加分类";
+      this.cate_id = "";
+      this.assort_name = ''
+    },
+    // 添加、编辑分类
+    submit() {
+      if (this.cate_name == "") {
+        this.$message.error("请填写分类名");
+        return;
+      }
+      if (this.icon == "") {
+        this.$message.error("请上传图标");
+        return;
+      }
+      let cate_id = "";
+      if (this.cate_id != "") {
+        cate_id = this.cate_id;
+      } else {
+        cate_id = "";
+      }
+      this.submitLoading = true;
+      this.ajax(
+        "cateAdd",
+        {
+          cate_name: this.cate_name,
+          pid:'',
+          is_show:1,
+          is_mobile_show:this.is_mobile_show,
+          is_recommend:this.is_recommend,
+          icon: this.icon,
+          cate_id: cate_id
+        },
+        "失败",
+        res => {
+          this.submitLoading = false;
+          if (res.errno == 0) {
+            this.isCate = false;
+            this.cateList();
+            if (this.cate_id != "") {
+              this.$message.success("编辑成功");
+            } else {
+              this.$message.success("添加成功");
+            }
+          } else {
+            this.$message.error(res.errmsg);
+          }
+        },
+        err => {
+          this.submitLoading = false;
+        }
+      );
+    },
+
+    // 编辑
+    edit(id, name, icon,is_mobile_show,is_recommend) {
+      this.isCate = true;
+      this.title = "编辑分类";
+      this.cate_id = id;
+      this.cate_name = name;
+      this.icon = icon;
+      this.is_mobile_show = Number(is_mobile_show);
+      this.is_recommend = Number(is_recommend);
+    },
+
+    // 删除分类
+    del(id) {
+      this.$confirm("此操作将删除该分类, 是否继续?", "提示", {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning"
+      })
+        .then(() => {
+          this.ajax(
+            "cateDel",
+            {
+              table: "cate",
+              id: id,
+              is_show: 0
+            },
+            "删除失败",
+            res => {
+              if (res.errno == 0) {
+                this.$message.success("删除成功");
+                this.cateList()
+              }
+            },
+            err => {}
+          );
+        })
+        .catch(() => {
+          this.$message({
+            type: "info",
+            message: "已取消删除"
+          });
+        });
+    }
+  }
+};
+</script>
+<style lang="less">
+.cateList {
+  padding: 20px;
+  .operate-con {
+	  padding: 10px 0;
+    .search-con {
+	  float: left;
+	  width: 80%;
+	  .el-form-item {
+		width: 30%;
+		float: left;
+		margin-bottom: 0;
+		.el-form-item__label {
+			font-size: 0.9rem;
+		}
+		.el-form-item__content {
+			margin-right: 30px;
+			.el-input {
+			width: 100%;
+			.read-idCard {
+				color: #3B6AF1;
+				background: #F0F8FF;
+				font-size: 0.75rem;
+				cursor: pointer;
+			}
+		}
+		}
+		.el-range-editor {
+			width: 90%;
+		}
+		
+	}
+	}
+
+    .btn-con {
+      float:right;
+    }
+  }
+  .el-pagination {
+    float: right;
+    margin-top: 30px;
+    margin-bottom: 30px;
+  }
+
+  .el-table {
+    img {
+      width: 60px;
+      height: 60px;
+    }
+  }
+
+  .add {
+    p {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+      padding-left: 30%;
+      >.el-input {
+        width: 40%;
+        margin-left: 10px;
+      }
+    }
+    .el-radio {
+        margin-left: 10px;
+      }
+    .el-button {
+      display: block;
+      margin: 20px auto;
+    }
+    .avatar-uploader .el-upload {
+      border: 1px dashed #d9d9d9;
+      border-radius: 6px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      margin-left: 10px;
+    }
+    .avatar-uploader .el-upload:hover {
+      border-color: #409eff;
+    }
+    .avatar-uploader-icon {
+      font-size: 28px;
+      color: #8c939d;
+      width: 100px;
+      height: 100px;
+      line-height: 100px;
+      text-align: center;
+    }
+    .el-upload img {
+      width: 100px;
+      height: 100px;
+    }
+  }
+}
+</style>

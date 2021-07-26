@@ -1,0 +1,286 @@
+
+export default {
+	/**
+	 * 接口登录状态过期，统一处理
+	 * @param that
+	 * @constructor
+	 */
+	tokenExpired: function (that) {
+		localStorage.clear()
+		sessionStorage.clear()
+		that.$message.error('登录状态过期，请重新登录！');
+		that.$router.push('/login');
+	},
+	/**
+	 * 角色不存在状态，统一处理
+	 * @param that
+	 * @constructor
+	 */
+	roleNoExist: function (that) {
+		localStorage.clear()
+		sessionStorage.clear()
+		that.$message.error('角色不存在，请重新登录！');
+		that.$router.push('/login');
+	},
+    /**
+	 * 接口暂无权限状态，统一处理
+	 * @param that
+	 * @constructor
+	 */
+	permissionsChange: function (that) {
+		localStorage.clear()
+		sessionStorage.clear()
+		that.$message.error('该访问暂无权限,请联系管理员确认');
+		that.$router.push({
+			path: '/noPermission',
+			query: {
+				parhName:that.$route.name
+			}
+		});
+	},
+	
+	/**
+	 * 多次遍历MD5
+	 * @param {String} val 需要被遍历的内容
+	 * @param {Number} num 遍历次数
+	 */
+	recursiveMD5: function (val, num) {
+		let md5 = require('js-md5')
+		for (let i = 0; i < num; i++) {
+			val = md5(val)
+		}
+		return val
+	},
+	/**
+    * 日期格式转换
+    * @param fmt 要处理成的日期格式 例: 'yyyy-MM-dd hh:mm:ss'
+    * @param date 要处理的日期，需Date类型
+    */
+   dateFormat: function(fmt, date) {
+	date = date ? date : new Date();
+	let o = {
+		"M+": date.getMonth() + 1, //月份
+		"d+": date.getDate(), //日
+		"h+": date.getHours() % 12 === 0 ? 12 : date.getHours() % 12, //小时
+		"H+": date.getHours(), //小时
+		"m+": date.getMinutes(), //分
+		"s+": date.getSeconds(), //秒
+		"q+": Math.floor((date.getMonth() + 3) / 3), //季度
+		"S": date.getMilliseconds() //毫秒
+	};
+	let week = {
+		"0": "/u65e5",
+		"1": "/u4e00",
+		"2": "/u4e8c",
+		"3": "/u4e09",
+		"4": "/u56db",
+		"5": "/u4e94",
+		"6": "/u516d"
+	};
+	if (/(y+)/.test(fmt)) {
+		fmt = fmt.replace(RegExp.$1, (date.getFullYear() + "").substr(4 - RegExp.$1.length));
+	}
+	if (/(E+)/.test(fmt)) {
+		fmt = fmt.replace(RegExp.$1, ((RegExp.$1.length > 1) ? (RegExp.$1.length > 2 ? "/u661f/u671f" : "/u5468") : "") + week[date.getDay() + ""]);
+	}
+	for (let k in o) {
+		if (new RegExp("(" + k + ")").test(fmt)) {
+			fmt = fmt.replace(RegExp.$1, (RegExp.$1.length === 1) ? (o[k]) : (("00" + o[k]).substr(("" + o[k]).length)));
+		}
+	}
+	return fmt;
+},
+// 金额转中文
+digitUppercase: function(price) {
+	let fraction = ['角', '分'];
+	let digit = [
+		'零', '壹', '贰', '叁', '肆',
+		'伍', '陆', '柒', '捌', '玖'
+	];
+	let unit = [
+		['元', '万', '亿'],
+		['', '拾', '佰', '仟']
+	];
+	let head = price < 0 ? '欠' : '';
+	price = Math.abs(price);
+	let s = '';
+	for (let i = 0; i < fraction.length; i++) {
+		s += (digit[Math.floor(price * 10 * Math.pow(10, i)) % 10] + fraction[i]).replace(/零./, '');
+	}
+	s = s || '整';
+	price = Math.floor(price);
+	for (let i = 0; i < unit[0].length && price > 0; i++) {
+		let p = '';
+		for (var j = 0; j < unit[1].length && price > 0; j++) {
+			p = digit[price % 10] + unit[1][j] + p;
+			price = Math.floor(price / 10);
+		}
+		s = p.replace(/(零.)*零$/, '').replace(/^$/, '零') + unit[0][i] + s;
+	}
+	return head + s.replace(/(零.)*零元/, '元')
+		.replace(/(零.)+/g, '零')
+		.replace(/^整$/, '零元整');
+},
+// 数字转中文
+noToChinese: function(num) {
+    if (!/^\d*(\.\d*)?$/.test(num)) {
+        alert("Number is wrong!");
+        return "Number is wrong!";
+    }
+    var AA = new Array("零", "一", "二", "三", "四", "五", "六", "七", "八", "九");
+    var BB = new Array("", "十", "百", "千", "万", "亿", "点", "");
+    var a = ("" + num).replace(/(^0*)/g, "").split("."),
+        k = 0,
+        re = "";
+    for (var i = a[0].length - 1; i >= 0; i--) {
+        switch (k) {
+            case 0:
+                re = BB[7] + re;
+                break;
+            case 4:
+                if (!new RegExp("0{4}\\d{" + (a[0].length - i - 1) + "}$").test(a[0]))
+                    re = BB[4] + re;
+                break;
+            case 8:
+                re = BB[5] + re;
+                BB[7] = BB[5];
+                k = 0;
+                break;
+        }
+        if (k % 4 == 2 && a[0].charAt(i + 2) != 0 && a[0].charAt(i + 1) == 0) re = AA[0] + re;
+        if (a[0].charAt(i) != 0) re = AA[a[0].charAt(i)] + BB[k % 4] + re;
+        k++;
+    }
+    if (a.length > 1) //加上小数部分(如果有小数部分) 
+    {
+        re += BB[6];
+        for (var i = 0; i < a[1].length; i++) re += AA[a[1].charAt(i)];
+	}
+    return re;
+},
+// 根据数据组内obj内的某个参数去重
+delObjByParam(allArr,param){
+	let objItem = {}
+	let tmpArr = []
+	for (var i = 0; i < allArr.length; i++) {
+		if (!objItem[allArr[i][param]]) {
+			tmpArr.push(allArr[i]);
+			objItem[allArr[i][param]] = true;
+		}
+	}
+	return tmpArr
+},
+// 处理左侧路由与顶部导航数据 ,返回数组下标0为 左侧导航栏数组, 下标1为顶部导航栏数组
+handleRoutesData(data) {
+	let tmpRouteArr = []
+	let tmpNavArr = [{
+		name: "首页",
+		push: "/index",
+		icon: require("../images/public/home-icon.png"),
+		active: true,
+	}]
+	let isAdmin = localStorage.getItem('is_admin')
+	data.forEach(item =>{
+		let tmpIcon = item.icon+''
+		let level1obj = {
+			title: item.title,
+			push: item.url,
+			icon: './static/img/'+item.icon,
+			selectIcon: './static/img/'+item.check_icon,
+			active: false,
+			children:[]
+		}
+		if(item.is_quick == 1) {
+			tmpNavArr.push({
+				name: item.quick_title,
+				push: item.url,
+				icon: './static/img/'+item.quick_icon,
+				active: false,
+			})
+		}
+		if(isAdmin == 1) {
+			if(item.title == '合作商城') {
+				level1obj.title = '供应商城'
+			}
+		}
+		if(item.child && item.child.length > 0) {
+			item.child.forEach(subItem =>{
+				let level2obj = {
+					title: subItem.title,
+					push: subItem.url,
+					icon: './static/img/'+subItem.icon,
+					selectIcon: './static/img/'+subItem.check_icon,
+					active: false,
+				}
+				if(subItem.is_quick == 1) {
+					tmpNavArr.push({
+						name: subItem.quick_title,
+						push: subItem.url,
+						icon: './static/img/'+subItem.quick_icon,
+						active: false,
+					})
+				}
+				level1obj.children.push(level2obj)
+			})
+		}
+		tmpRouteArr.push(level1obj)
+	})
+
+	return[tmpRouteArr,tmpNavArr]
+},
+// 检查token是否过期
+checkToken(that,callBack) {
+	let userInfo = localStorage.getItem('userInfo') ? JSON.parse(localStorage.getItem('userInfo')) : ''
+	if(userInfo && userInfo.post_id) {
+		that.ajax('checkToken',{},'',res =>{
+			callBack && typeof callBack == 'function' && callBack(res)
+		}, err =>{
+			callBack && typeof callBack == 'function' && callBack(res)
+		})
+	} else {
+		that.$message.error('请先登录')
+		that.$router.push('/login')
+	}
+},
+// 请求功能权限列表
+getPermissionList(that,callBack) {
+	let userInfo = localStorage.getItem('userInfo') ? JSON.parse(localStorage.getItem('userInfo')) : ''
+	if(userInfo && userInfo.post_id) {
+		that.ajax('functionList',{
+			url: that.$route.path,
+			post_id: userInfo.post_id
+		},'',res =>{
+			if(res.errno == 0) {
+				if(res.data && res.data.length > 0) {
+					callBack && typeof callBack == 'function' && callBack(res.data)
+				}
+			}
+		})
+	} else {
+		that.$message.error('请先登录')
+		that.$router.push('/login')
+	}
+	
+},
+// 管理员获取合作社
+getCooperativeList(that,successCallBack,errCallBack) {
+	that.ajax('cooperativeList',{},'',res =>{
+		if(res.errno == 0) {
+			if(res.data && res.data.length > 0) {
+				res.data.unshift({
+					coopera_name: '全部',
+					coopera_id: ''
+				})
+				successCallBack && typeof successCallBack == 'function' && successCallBack(res.data)
+			} else {
+				errCallBack && typeof errCallBack == 'function' && errCallBack(res)
+			}
+		} else {
+			errCallBack && typeof errCallBack == 'function' && errCallBack(res)
+		}
+	}, err =>{
+		errCallBack && typeof errCallBack == 'function' && errCallBack(err)
+	})
+},
+
+}

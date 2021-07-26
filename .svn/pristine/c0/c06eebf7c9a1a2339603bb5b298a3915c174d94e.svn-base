@@ -1,0 +1,823 @@
+<template>
+    <div class="organizationList" v-loading="loading">
+        <div class="breadcrumb-con">
+            <img class="left-icon" src="../../images/breadcrumb-left-icon.png" alt="">
+            <div class="breadcrumb-info">
+                <el-breadcrumb separator-class="el-icon-arrow-right">
+                    <el-breadcrumb-item>机构管理</el-breadcrumb-item>
+                    <el-breadcrumb-item :to="{ path: 'organizationList' }">机构列表</el-breadcrumb-item>
+                     <el-breadcrumb-item v-if="parentName" class="breadcrumb-tit">【{{parentName}}】下的合作社列表</el-breadcrumb-item>
+                </el-breadcrumb>
+            </div>
+            <el-button style="margin-right:1rem" size="small" @click="initData()">刷新</el-button>
+            <div class="back-con" @click="goBack">
+              <img class="back-icon" src="../../images/breadcrumb-back-icon.png" alt="">
+              <span class="back-text">返回上一页</span>
+            </div>
+        </div>
+        <div class="operate-con clearfix">
+          <div class="search-con">
+            <el-form class="clearfix"  label-width="100px">
+                <el-form-item label="合作社名称">
+                  <el-input v-model="cooperaName" placeholder="请输入合作社名称" clearable @clear="clearCooperName"></el-input>
+                </el-form-item>
+                <el-form-item label="审批状态">
+                  <el-select v-model="shenpiStatus" placeholder="请选择审批状态" @change="changeShenpiStatus">
+                        <el-option v-for="(item,index) in statusOptions" :key="index" :label="item.name" :value="item.id"></el-option>
+                    </el-select>
+                </el-form-item>
+                <el-button type="primary" size="small" :loading="loading" @click="search()">{{loading ? '获取数据中...' : '查询'}}</el-button>
+            </el-form>
+          </div>
+        </div>
+       <div class="table-con">
+            <div>
+                <el-table :data="tableData"  v-if="tableData && tableData.length > 0"  border >
+                <el-table-column prop="coopera_id" label="ID" width="70" align="center"></el-table-column>
+                <el-table-column prop="worker_name" label="机构类型" align="center">
+                    <template slot-scope="scope">
+                        {{scope.row.coopera_level==0?'合作社':'合作联社'}}
+                    </template>
+                </el-table-column>
+                <el-table-column prop="pname" label="所属合作联社" width="150" show-overflow-tooltip align="center" v-if="type==0"></el-table-column>
+                <el-table-column prop="coopera_name" label="合作社名称" width="150" show-overflow-tooltip align="center"></el-table-column>
+                <el-table-column prop="business_reg_nums" label="自然人人数" width="100" align="center"></el-table-column>
+                <el-table-column prop="legal_person_name" label="社长姓名" align="center" ></el-table-column>
+                <el-table-column prop="legal_person_phone" label="联系方式" width="120" align="center" ></el-table-column>
+                <el-table-column prop="stock_money" label="入股资金" align="center" ></el-table-column>
+                <el-table-column prop="stock_amount" label="入股份额" align="center" ></el-table-column>
+                 <el-table-column prop="stock_money" label="合计入股资金" align="center" width="120" v-if="type == 1">
+                   <template slot-scope="scope">
+                     <span style="color:#f56c6c">{{scope.row.coopera_id == 17 ? '6357180.94' : 0}}</span>
+                   </template>
+                 </el-table-column>
+                <el-table-column prop="stock_amount" label="合计入股份额" align="center" width="120" v-if="type == 1">
+                   <template slot-scope="scope">
+                     <span style="color:#f56c6c">{{scope.row.coopera_id == 17 ? '127.1436188' : 0}}</span>
+                   </template>
+                </el-table-column>
+                <el-table-column prop="province_name" label="合作社地址" width="150" show-overflow-tooltip align="center" >
+                    <template slot-scope="scope">
+                        {{scope.row.coopera_address}}
+                    </template>
+                </el-table-column>
+                <el-table-column label="微信认证" align="center" width="100">
+                    <template slot-scope="scope">
+                      <template v-if="scope.row.identify==1">
+                        <template v-if="isWxAuth">
+                          <el-button type="text" size="small"  @click="toWeixinAuth(scope.row.coopera_id)">未认证</el-button>
+                        </template>
+                        <template v-else>
+                          <el-tag type="">未认证</el-tag>
+                        </template>
+                      </template>
+                      <template v-if="scope.row.identify==2">
+                        <el-tag type="warning">认证中</el-tag>
+                      </template>
+                      <template v-if="scope.row.identify==3">
+                          <el-tag type="success">已认证</el-tag>
+                      </template>
+                      <template v-if="scope.row.identify==4">
+                          <template v-if="isWxAuth">
+                            <el-button type="text" style="color:#f56c6c" size="small" @click="toWeixinAuth(scope.row.coopera_id)">认证拒绝</el-button>
+                          </template>
+                          <template v-else>
+                              <el-tag type="danger">认证拒绝</el-tag>
+                          </template>
+                      </template>
+                        <!-- <el-button type="text"  size="small" @click="toWeixinAuth(scope.row.coopera_id)" v-if="isWxAuth">{{scope.row.identify==1?'未认证':scope.row.identify==2?'认证中':scope.row.identify==3?'已认证':scope.row.identify==4?'认证拒绝':''}}</el-button>
+                        <el-button type="text" size="small" v-else>{{scope.row.identify==1?'未认证':scope.row.identify==2?'认证中':scope.row.identify==3?'已认证':scope.row.identify==4?'认证拒绝':''}}</el-button> -->
+                    </template>
+                </el-table-column>
+                <el-table-column label="支付宝认证" align="center" width="100">
+                    <template slot-scope="scope">
+                        <template v-if="scope.row.ali_identify==1">
+                            <el-tag type="">未认证</el-tag>
+                        </template>
+                        <template v-if="scope.row.ali_identify==2">
+                          <el-tag type="warning">认证中</el-tag>
+                        </template>
+                        <template v-if="scope.row.ali_identify==3">
+                            <el-tag type="success">已认证</el-tag>
+                        </template>
+                        <template v-if="scope.row.ali_identify==4">
+                              <el-tag type="danger">认证拒绝</el-tag>
+                        </template>
+                        <!-- <el-button type="text" size="small">{{scope.row.ali_identify==1?'未认证':scope.row.ali_identify==2?'认证中':scope.row.ali_identify==3?'已认证':scope.row.ali_identify==4?'认证拒绝':''}}</el-button> -->
+                    </template>
+                </el-table-column>
+                <el-table-column label="审批状态" align="center" width="100">
+                    <template slot-scope="scope">
+                      <template v-if="scope.row.coopera_status==0">
+                          <el-tag type="" effect="dark" size="small">待审批</el-tag>
+                      </template>
+                      <template v-if="scope.row.coopera_status==1">
+                        <el-tag type="success" effect="dark" size="small">已通过</el-tag>
+                      </template>
+                      <template v-if="scope.row.coopera_status==2">
+                          <el-tag type="warning" effect="dark" size="small">已拒绝</el-tag>
+                      </template>
+                      <template v-if="scope.row.coopera_status==3">
+                            <el-tag type="danger" effect="dark" size="small">已注销</el-tag>
+                      </template>
+                        <!-- <el-button type="text" size="small">{{scope.row.coopera_status==1?'已通过':scope.row.coopera_status==2?'已驳回':scope.row.coopera_status==3?'已注销':scope.row.coopera_status==0?'待审批':''}}</el-button> -->
+                    </template>
+                </el-table-column>
+                <el-table-column label="操作" align="center" width="200" fixed="right">
+                    <template slot-scope="scope">
+                        <el-button type="primary" plain size="mini" @click="look(scope.row)">查看详情</el-button>
+                        <el-button type="danger" plain size="mini" @click="writeOff(scope.row)" v-if="isZhuxiao && scope.row.coopera_status == 1">注销</el-button>
+                    </template>
+                </el-table-column>
+                </el-table>
+
+                <el-pagination v-if="totalPage && totalPage > 0" background :current-page="curPage" layout="prev, pager, next" :total="totalPage*10"  @current-change="handleCurPageChange"> </el-pagination>
+            </div>
+            <div v-if="!tableData || tableData.length == 0">
+              <div class="no-data-con" >
+                <div class="absolute-center">
+                  <div class="err-info-text" v-if="cooperaName && isSearch">暂无搜索结果,请换个关键词再试试</div>
+                  <div class="err-info-text" v-else>暂无{{shenpiStatus === '0' ? '申请中' : (shenpiStatus == 1 ? '已通过' : (shenpiStatus == 2 ? '已驳回' : (shenpiStatus == 3 ? '已注销' : '')))}}{{type == 0 ? '合作社' : '合作联社'}}</div>
+                </div>
+              </div>
+            </div>
+        </div>
+
+        <el-drawer :visible.sync="isDetail" :with-header="false" size="60%">
+            <div class="drawer-tit-con" >
+              <div class="tit">合作社详情</div>
+              <div class="icon-con" @click="isDetail = false">
+                <i class="el-icon-circle-close"></i>
+              </div>
+            </div>
+            <el-form :model="form">
+                <div class="tit-con">
+                    <div class="shu"></div>
+                    <span class="tit">合作社信息</span>
+                    <div class="bg"></div>
+                </div>
+                <div class="form-item-con clearfix">
+                  <el-form-item label="营业执照" style="height:auto" :label-width="formLabelWidth">
+                    <!-- <img v-if="form.license" :src="form.license" class="avatar">
+                    <i v-else class="el-icon-plus avatar-uploader-icon"></i> -->
+                    <el-image fit="cover" :src="form.license" :preview-src-list="[form.license]">
+                      <div slot="error" class="image-slot">
+                        <i class="el-icon-picture-outline"></i>
+                        <span class="text">暂无图片</span>
+                      </div>
+                    </el-image>
+                  </el-form-item>
+                  <el-form-item label="其他相关证件照片" style="height:auto" :label-width="formLabelWidth">
+                    <!-- <img v-if="form.certificates_img" :src="form.certificates_img" class="avatar">
+                    <i class="el-icon-plus avatar-uploader-icon"></i> -->
+                     <el-image fit="cover" :src="form.certificates_img" :preview-src-list="[form.certificates_img]">
+                        <div slot="error" class="image-slot">
+                          <i class="el-icon-picture-outline"></i>
+                          <span class="text">暂无图片</span>
+                        </div>
+                      </el-image>
+                  </el-form-item>
+                  <el-form-item label="合作社名称" :label-width="formLabelWidth">
+                      <el-input autocomplete="off" v-model="form.coopera_name" readonly></el-input>
+                  </el-form-item>
+                  <el-form-item label="合作社营业地址" :label-width="formLabelWidth">
+                        <el-input autocomplete="off" v-model="address" readonly></el-input>
+                    </el-form-item>
+                    <el-form-item label="工商登记人数" :label-width="formLabelWidth">
+                        <el-input autocomplete="off" v-model="form.business_reg_nums" readonly></el-input>
+                    </el-form-item>
+                    <el-form-item label="经营范围" :label-width="formLabelWidth">
+                        <el-input autocomplete="off" v-model="form.business_scope" readonly></el-input>
+                    </el-form-item>
+                </div>
+                <div class="tit-con">
+                    <div class="shu"></div>
+                    <span class="tit">法人信息</span>
+                    <div class="bg"></div>
+                </div>
+                <div class="form-item-con clearfix">
+                    <el-form-item label="身份证正面" style="height:auto" :label-width="formLabelWidth">
+                      <el-image fit="cover" :src="form.card_front" :preview-src-list="[form.card_front]">
+                        <div slot="error" class="image-slot">
+                          <i class="el-icon-picture-outline"></i>
+                          <span class="text">暂无图片</span>
+                        </div>
+                      </el-image>
+                      <!-- <img v-if="form.card_front" :src="form.card_front" class="avatar">
+                      <i v-else class="el-icon-plus avatar-uploader-icon"></i> -->
+                    </el-form-item>
+                    <el-form-item label="身份证反面" style="height:auto" :label-width="formLabelWidth">
+                      <el-image fit="cover" :src="form.card_back" :preview-src-list="[form.card_back]">
+                        <div slot="error" class="image-slot">
+                          <i class="el-icon-picture-outline"></i>
+                          <span class="text">暂无图片</span>
+                        </div>
+                      </el-image>
+                        <!-- <img v-if="form.card_back" :src="form.card_back" class="avatar">
+                        <i v-else class="el-icon-plus avatar-uploader-icon"></i> -->
+                    </el-form-item>
+                    <el-form-item label="法人代表姓名" :label-width="formLabelWidth">
+                        <el-input autocomplete="off" v-model="form.legal_person_name" readonly></el-input>
+                    </el-form-item>
+                    <el-form-item label="联系方式" :label-width="formLabelWidth">
+                        <el-input autocomplete="off" v-model="form.legal_person_phone" readonly></el-input>
+                    </el-form-item>
+                </div>
+              </el-form>
+              
+              <div class="drawer-footer" >
+                <div class="tit-con">
+                    <div class="shu"></div>
+                    <span class="tit">审核状态</span>
+                    <div class="bg"></div>
+                </div>
+                <div class="btn-con">
+                    <template v-if="curApproveStatus == 0">
+                      <template v-if="isApprove">
+                        <el-button @click="checkCoopera('1')"  type="primary">通 过</el-button>
+                        <el-button @click="submitTurn"  type="danger"  >拒 绝</el-button>
+                      </template>
+                      <template v-else>
+                        <el-button plain>未审核</el-button>
+                      </template>
+                    </template>
+
+                    <template v-if="curApproveStatus == 1">
+                      <el-button type="success" plain>已通过</el-button>
+                    </template>
+
+                    <template v-if="curApproveStatus == 2">
+                      <el-button type="danger" plain>已拒绝</el-button>
+                    </template>
+                </div>
+              </div>
+        </el-drawer>
+
+        <!-- <el-dialog title="合作社详情" :visible.sync="isDetail">
+            <el-form :model="form">
+                <el-form-item label="营业执照" :label-width="formLabelWidth">
+                    <img v-if="form.license" :src="form.license" class="avatar">
+                    <i v-else class="el-icon-plus avatar-uploader-icon"></i>
+                </el-form-item>
+                <el-form-item label="身份证正面" :label-width="formLabelWidth">
+                    <img v-if="form.card_front" :src="form.card_front" class="avatar">
+                    <i v-else class="el-icon-plus avatar-uploader-icon"></i>
+                </el-form-item>
+                <el-form-item label="身份证反面" :label-width="formLabelWidth">
+                    <img v-if="form.card_back" :src="form.card_back" class="avatar">
+                    <i v-else class="el-icon-plus avatar-uploader-icon"></i>
+                </el-form-item>
+                <el-form-item label="合作社名称" :label-width="formLabelWidth">
+                    <el-input autocomplete="off" v-model="form.coopera_name" readonly></el-input>
+                </el-form-item>
+                <el-form-item label="法人代表姓名" :label-width="formLabelWidth">
+                    <el-input autocomplete="off" v-model="form.legal_person_name" readonly></el-input>
+                </el-form-item>
+                <el-form-item label="联系方式" :label-width="formLabelWidth">
+                    <el-input autocomplete="off" v-model="form.legal_person_phone" readonly></el-input>
+                </el-form-item>
+                <el-form-item label="合作社营业地址" :label-width="formLabelWidth">
+                    <el-input autocomplete="off" v-model="address" readonly></el-input>
+                </el-form-item>
+                <el-form-item label="工商登记人数" :label-width="formLabelWidth">
+                    <el-input autocomplete="off" v-model="form.business_reg_nums" readonly></el-input>
+                </el-form-item>
+                <el-form-item label="经营范围" :label-width="formLabelWidth">
+                    <el-input autocomplete="off" v-model="form.business_scope" readonly></el-input>
+                </el-form-item>
+            </el-form>
+            <div slot="footer" class="dialog-footer" v-if="isApprove && curApproveStatus == 0">
+                <el-button @click="checkCoopera('1')" type="primary">通 过</el-button>
+                <el-button @click="isTurn = true">拒 绝</el-button>
+            </div>
+        </el-dialog> -->
+
+        <el-dialog title="驳回原因" :visible.sync="isTurn">
+            <el-form :model="ruleForm" :rules="rules" ref="ruleForm">
+                <el-form-item label="驳回原因" :label-width="formLabelWidth" prop="reason">
+                    <el-input autocomplete="off" placeholder="请输入驳回原因" v-model="ruleForm.reason"></el-input>
+                </el-form-item>
+            </el-form>
+            <div slot="footer" class="dialog-footer">
+                <el-button @click="isTurn = false">取 消</el-button>
+                <el-button type="primary" @click="submitTurn('ruleForm')" :loading="submitLoading">{{submitLoading ? '提交中...' : '确 定'}}</el-button>
+            </div>
+        </el-dialog>
+    </div>
+</template>
+<script>
+export default {
+  name: "organizationList",
+  data() {
+    return {
+      parentName: '',
+      parentId: '',
+      isSearch: false,
+
+      tableData: [],
+      curPage: 1,
+      totalPage: 1,
+      curInnerPage: 1,
+      loading: false,
+      submitLoading: false,
+      lastSearch: "",
+
+      isTurn: false,
+      ruleForm: {
+        reason: ""
+      },
+      rules: {
+        reason: [{ required: true, message: "请输入驳回原因", trigger: "blur" }]
+      },
+      formLabelWidth: "220px",
+      form: {},
+      address: "",
+      isDetail: false,
+
+      typeOptions: [{ name: "合作社", id: "0" }, { name: "合作联社", id: "1" }],
+      statusOptions: [
+        { name: "全部", id: "" },
+        { name: "申请中", id: "0" },
+        { name: "已通过", id: "1" },
+        { name: "已驳回", id: "2" },
+        { name: "已注销", id: "3" }
+      ],
+      type: "1",
+      cooperaName: "",
+      shenpiStatus: "",
+      curApproveStatus: '', // 当前数据的审批状态
+      curRow: '', //当前展开的合作联社数据
+
+      isAdmin: true,
+      isSecond: true, //合作联社查看合作社
+
+      isApprove: false,
+      isZhuxiao: false,
+      isWxAuth: false,
+
+    };
+  },
+  activated() {
+    //判断是否为管理员
+    let adminType = localStorage.getItem("is_admin");
+    if (adminType && Number(adminType) == 1) {
+      this.isAdmin = true;
+      this.isSecond = true;
+      this.type = "1";
+    } else if (adminType && Number(adminType) == 2) {
+      this.isAdmin = false;
+      this.isSecond = true;
+      this.type = "1";
+    } else if (adminType && Number(adminType) == 3) {
+      this.isAdmin = false;
+      this.isSecond = false;
+      this.type = "0";
+    }
+    this.parentName = this.$route.query.name
+    this.parentId = this.$route.query.id
+    this.isSearch = false;
+    this.tableData = [];
+    this.secondData = []
+    this.curPage = 1;
+    this.loading = true;
+    this.getList();
+    this.handlePermission();
+  },
+  methods: {
+    // 返回上一页
+    goBack() {
+        this.$router.push({
+            path:'/organizationList',
+            query:{
+                isRefresh: 1,
+            }
+        })
+    },
+    initData() {
+      //判断是否为管理员
+      let adminType = localStorage.getItem("is_admin");
+      if (adminType && Number(adminType) == 1) {
+        this.isAdmin = true;
+        this.isSecond = true;
+        this.type = "1";
+      } else if (adminType && Number(adminType) == 2) {
+        this.isAdmin = false;
+        this.isSecond = true;
+        this.type = "1";
+      } else if (adminType && Number(adminType) == 3) {
+        this.isAdmin = false;
+        this.isSecond = false;
+        this.type = "0";
+      }
+
+      this.parentName = this.$route.query.name
+      this.parentId = this.$route.query.id
+      this.tableData = [];
+      this.secondData = []
+      this.curPage = 1;
+      this.loading = true;
+      this.getList();
+      this.handlePermission();
+    },
+    // 判断当前页面都有什么权限
+    handlePermission() {
+      let that = this;
+      that.utils.getPermissionList(that, data => {
+        data.forEach(item => {
+          if (item.title == "审批") {
+            that.isApprove = true;
+          }
+          if (item.title == "注销") {
+            that.isZhuxiao = true;
+          }
+          if (item.title == "微信认证") {
+            that.isWxAuth = true;
+          }
+        });
+      },'/organizationList');
+    },
+    // 改变审批状态
+    changeShenpiStatus() {
+      this.curPage = 1
+      this.isSearch = false
+      this.getList()
+    },
+     // 清空合作社名称
+    clearCooperName() {
+      this.curPage = 1
+      this.cooperaName = ''
+      this.isSearch = false
+      this.getList()
+    },
+    search() {
+      this.curPage = 1;
+      this.totalPage = null;
+      this.tableData = [];
+      this.loading = true;
+      this.isSearch = true
+      this.getList();
+      return
+      if (this.lastSearch == this.type + this.cooperaName + this.shenpiStatus) {
+        // 与上次输入搜索条件相同不走接口
+        if (this.type || this.cooperaName || this.shenpiStatus) {
+          this.$message.error("请勿重复查询!");
+        } else {
+          this.$message.error("请至少输入一项查询条件!");
+          document
+            .getElementsByClassName("search-con")[0]
+            .querySelector("input")
+            .focus();
+        }
+      } else {
+        // 与上次输入搜索条件不同
+        if (this.type || this.cooperaName || this.shenpiStatus) {
+          // 如果之前没有条件查询过 至少要输入一个查询条件
+          this.curPage = 1;
+          this.totalPage = null;
+          this.tableData = [];
+          this.loading = true;
+          this.getList();
+        } else {
+          // 未填写查询条件
+          if (this.lastSearch) {
+            // 如果之前有条件查询过 可走接口查询全部
+            this.curPage = 1;
+            this.totalPage = null;
+            this.tableData = [];
+            this.loading = true;
+            this.getList();
+          } else {
+            this.$message.error("请至少输入一项查询条件!");
+            document
+              .getElementsByClassName("search-con")[0]
+              .querySelector("input")
+              .focus();
+          }
+        }
+      }
+    },
+    //   列表
+    getList() {
+      this.loading = true
+      this.ajax(
+        "cooperaList",
+        {
+          page: this.curPage,
+          size: 10,
+          coopera_level: '0',
+          coopera_name: this.cooperaName,
+          coopera_status: this.shenpiStatus,
+          parent_id: this.parentId
+        },
+        "查询失败",
+        res => {
+          this.loading = false;
+          if (res.errno == 0) {
+            this.tableData = res.data.data
+            this.curPage = Number(res.data.current_page);
+            this.totalPage = res.data.total;
+          }
+        },
+        err => {
+          this.loading = false;
+        }
+      );
+    },
+    // 查看详情
+    look(row) {
+      this.form = row;
+      this.address = row.coopera_address;
+      this.isDetail = true;
+      this.curApproveStatus = 0
+
+    },
+    //   注销
+    writeOff(row) {
+      this.form = row;
+      this.$confirm("此操作将注销合作社, 是否继续?", "提示", {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning"
+      })
+        .then(() => {
+          this.checkCoopera("3");
+        })
+        .catch(() => {});
+    },
+    // 审核
+    checkCoopera(status) {
+      this.ajax(
+        "updateCooperaStatus",
+        {
+          coopera_id: this.form.coopera_id,
+          coopera_status: status,
+          reject_note: this.ruleForm.reason
+        },
+        "审核失败",
+        res => {
+          if (res.errno == 0) {
+            this.$message.success(res.errmsg);
+            this.getList();
+            if (status == 1) {
+              this.isDetail = false;
+            } else if (status == 2) {
+              this.isTurn = false;
+              this.isDetail = false;
+            }
+          }
+        },
+        err => {}
+      );
+    },
+    // 驳回原因确认
+    submitTurn(formName) {
+      this.$refs[formName].validate(valid => {
+        if (valid) {
+          this.checkCoopera("2");
+        } else {
+          setTimeout(() => {
+            let isError = document.getElementsByClassName("is-error");
+            let firstErrInput = isError[0].querySelector("input");
+            if (firstErrInput.type == "file") {
+              document.querySelectorAll(
+                ".el-scrollbar__wrap"
+              )[1].scrollTop = 50;
+            } else {
+              firstErrInput.focus();
+            }
+          }, 100);
+          return false;
+        }
+      });
+    },
+    toWeixinAuth(id) {
+      this.$router.push({
+        path: "/weixinAuth",
+        query: {
+          coopera_id: id
+        }
+      });
+    },
+    // 切换分页
+    handleCurPageChange(val) {
+      this.curPage = val;
+      this.getList();
+    },
+   
+  }
+};
+</script>
+<style lang="less">
+.organizationList {
+  padding: 20px;
+  .search-con {
+    .el-form-item {
+      width: 20%;
+      float: left;
+      margin-bottom: 0;
+      .el-form-item__label {
+        font-size: 0.9rem;
+      }
+      .el-input {
+        width: 80%;
+        .read-idCard {
+          color: #3b6af1;
+          background: #f0f8ff;
+          font-size: 0.75rem;
+          cursor: pointer;
+        }
+      }
+    }
+  }
+  .table-con{
+    div{
+      >.el-table {
+        background: transparent;
+        margin-top: 20px;
+      }
+      >.el-table::before {
+        height: 0;
+      }
+    }
+    .inner-table-tit-con {
+			display: flex;
+			align-content: center;
+			justify-content: space-between;
+			.inner-table-tit {
+				flex: 1;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-weight: bold;
+				font-size: 1.2rem;
+				padding-bottom: 1.25rem;
+				text-align: center;
+				.btn-con {
+					display: flex;
+					align-items: center;
+					justify-content: center;
+				}
+			}
+		}	
+        
+        .inner-table {
+            thead {
+                tr th{
+                    background: #f9f9f9!important;
+                }
+            }
+        }
+  }
+  
+  .el-pagination {
+    float: right;
+    margin-top: 30px;
+    margin-bottom: 30px;
+  }
+  .el-dialog {
+    .el-input {
+      width: 50%;
+      .el-input {
+        width: 100%;
+      }
+      textarea {
+        font-family: "微软雅黑";
+      }
+    }
+  }
+  .avatar-uploader-icon {
+    font-size: 28px;
+    color: #8c939d;
+    width: 100px;
+    height: 100px;
+    line-height: 100px;
+    text-align: center;
+  }
+  .avatar {
+    width: 100px;
+    height: 100px;
+    display: block;
+  }
+  .el-drawer {
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+    box-shadow: 10px 8px 18px #000;
+  }
+  .el-drawer.rtl {
+    top: 5rem;
+    bottom: 0.5rem;
+    height: calc(100% - 5.5rem);
+    .el-drawer__body {
+      display: flex;
+      flex-direction: column;
+    }
+  }
+  .drawer-tit-con {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+    padding: 15px;
+    .tit {
+      font-weight: bold;
+    }
+    .icon-con {
+      font-size: 1.5rem;
+      color: #666;
+      cursor: pointer;
+    }
+  }
+  .drawer-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    height: 100px;
+    padding: 0 25px;
+    .tit-con {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      position: relative;
+      .shu {
+          width: 0.28rem;
+          height: 1rem;
+          background-color: #3B6AF1;
+      }
+      .tit {
+          color: #444444;
+          padding: 0 0.8rem;
+          line-height: 1rem;
+      }
+      .bg {
+          flex: 1;
+          background: url('../../images/baseInfo/tit-bg.png');
+          height: 1rem;
+          background-size: 100% 100%;
+      }
+      .del-family-icon {
+          position:absolute;
+          right: 0;
+          top: 0.5rem;
+          height: 1.5rem;
+          cursor: pointer;
+      }
+    }
+    .btn-con {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  }
+  .el-form {
+    height: calc(100% - 160px);
+    overflow-y:auto;
+    padding: 0 25px;
+    .tit-con {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      position: relative;
+      .shu {
+          width: 0.28rem;
+          height: 1rem;
+          background-color: #3B6AF1;
+      }
+      .tit {
+          color: #444444;
+          padding: 0 0.8rem;
+          line-height: 1rem;
+      }
+      .bg {
+          flex: 1;
+          background: url('../../images/baseInfo/tit-bg.png');
+          height: 1rem;
+          background-size: 100% 100%;
+      }
+      .del-family-icon {
+          position:absolute;
+          right: 0;
+          top: 0.5rem;
+          height: 1.5rem;
+          cursor: pointer;
+      }
+    }
+  }
+  .el-form::-webkit-scrollbar {/*滚动条整体样式*/
+    width: 6px;     /*高宽分别对应横竖滚动条的尺寸*/
+    height: 8px;
+    border-radius: 100px;
+
+  }
+  .el-form::-webkit-scrollbar-thumb {/*滚动条里面小方块*/
+      border-radius: 100px;
+      background: rgba(94, 92, 92, 0.2);
+  }
+  .el-form::-webkit-scrollbar-track {/*滚动条里面轨道*/
+      // -webkit-box-shadow: inset 0 0 5px rgba(0,0,0,0.2);
+      // border-radius: 0;
+      // background: rgba(0,0,0,0.1);
+  }
+}
+</style>

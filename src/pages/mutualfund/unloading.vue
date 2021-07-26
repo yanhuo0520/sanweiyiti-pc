@@ -1,0 +1,461 @@
+<template>
+    <div class="unloading">
+        <el-form ref="ruleForm" label-width="100px" :model="ruleForm" :rules="rules">
+            <div class="breadcrumb-con">
+                <img class="left-icon" src="../../images/breadcrumb-left-icon.png" alt="">
+                <div class="breadcrumb-info">
+                    <el-breadcrumb separator-class="el-icon-arrow-right">
+                        <el-breadcrumb-item>互助金业务</el-breadcrumb-item>
+                        <el-breadcrumb-item  class="breadcrumb-tit">互助金转存</el-breadcrumb-item>
+                    </el-breadcrumb>
+                </div>
+            </div>
+            <div class="tit-con">
+                <div class="shu"></div>
+                <span class="tit">转出账户</span>
+                <div class="bg"></div>
+            </div>
+
+            <div class="form-item-con clearfix">
+                <el-form-item label="转出账户:" prop="turnout_passbook_num">
+                    <el-input v-model="ruleForm.turnout_passbook_num" placeholder="请输入转出账户卡号" clearable :readonly="isReadOut">
+                        <template #append>
+                            <span class="read-idCard" @click="readBankNo('out')">读卡号</span>
+                        </template>
+                    </el-input>
+                    <el-button type="primary" size="small" @click="findcard('out')" >查询</el-button>
+                </el-form-item>
+                <el-form-item label="社员姓名:">
+                    <el-input v-model="outInfo.name" clearable readonly></el-input>
+                </el-form-item>
+                <el-form-item label="卡状态:">
+                    <span>{{outInfo.user_status==1?'正常':outInfo.user_status==0?'锁定':outInfo.user_status==2?'退社':''}}</span>
+                </el-form-item>
+                <el-form-item label="活期余额:">
+                    <el-input v-model="outInfo.money" clearable readonly></el-input>
+                </el-form-item>
+            </div>
+
+            <div class="tit-con">
+                <div class="shu"></div>
+                <span class="tit">转入账户</span>
+                <div class="bg"></div>
+            </div>
+            <div class="form-item-con clearfix">
+                <el-form-item label="转入账户:" prop="turnin_passbook_num">
+                    <el-input v-model="ruleForm.turnin_passbook_num" placeholder="请输入转入账户卡号" clearable :readonly="isReadIn">
+                        <template #append>
+                            <span class="read-idCard" @click="readBankNo('in')">读卡号</span>
+                        </template>
+                    </el-input>
+                     <el-button type="primary" size="small" @click="findcard('in')" >查询</el-button>
+                </el-form-item>
+                <el-form-item label="社员姓名:">
+                    <el-input v-model="inInfo.name" clearable readonly></el-input>
+                </el-form-item>
+                <el-form-item label="卡状态:">
+                    <span>{{inInfo.user_status==1?'正常':inInfo.user_status==0?'锁定':inInfo.user_status==2?'退社':''}}</span>
+                </el-form-item>
+            </div>
+
+            <div class="tit-con">
+                <div class="shu"></div>
+                <span class="tit">活期转出</span>
+                <div class="bg"></div>
+            </div>
+
+            <div class="form-item-con clearfix">
+                <el-form-item label="转出金额:" prop="turnout_money">
+                    <el-input v-model="ruleForm.turnout_money" placeholder="请输入转出金额" clearable @input="inputMoney" type="number"></el-input>
+                </el-form-item>
+                <el-form-item label="大写:">
+                    <el-input v-model="daxiedrawMoney" clearable readonly></el-input>
+                </el-form-item>
+                <el-form-item label="密码:">
+                    <el-input v-model="password" placeholder="请输入密码" clearable type="password"></el-input>
+                </el-form-item>
+            </div>
+            <div class="btn-con">
+                <!-- <el-button type="primary" round @click="submitForm('ruleForm')" :loading="submitLoading">{{submitLoading ? '提交中...' : '保存并打印'}}</el-button> -->
+                <el-button type="warning" round v-if="isReadOut || isReadIn">其中有的卡状态暂不能存入</el-button>
+                <el-button type="primary" round @click="submitForm('ruleForm')" :loading="submitLoading" v-else>{{submitLoading ? '提交中...' : '保存'}}</el-button>
+            </div>
+        </el-form>
+
+        <div class="iframe-absolute-con" v-if="showReadIc" @click="showReadIc = false">
+            <iframe @click.stop=""  class="ic-iframe" id="readIcIframeId"  frameborder="0"></iframe>
+        </div>
+    </div>
+</template>
+<script>
+export default {
+  name: "unloading",
+  data() {
+    return {
+      ruleForm: {
+        turnout_passbook_num: "",
+        turnin_passbook_num: "",
+        turnout_money: ""
+      },
+      rules: {
+        turnout_passbook_num: [
+          { required: true, message: "请输入转出账户", trigger: "blur" }
+        ],
+        turnin_passbook_num: [
+          { required: true, message: "请输入转入账户", trigger: "blur" }
+        ],
+        turnout_money: [
+          { required: true, message: "请输入转出金额", trigger: "blur" }
+        ]
+      },
+      daxiedrawMoney: "",
+      password: "",
+      outInfo: {},
+      inInfo: {},
+      isOut: false,
+      isIn: false,
+
+      showReadIc: false, // 读取卡号弹窗
+      icUuid: '', // IC卡芯片卡号
+      
+      submitLoading: false,
+
+      isReadOut: false,
+      isReadIn: false
+    };
+  },
+   created() {
+    window.addEventListener("message",(event)=>{
+         if(event.data && event.data.path && event.data.path == 'unloadingReadIcout') {
+            if(event.data.type == 'data') {
+                this.icUuid = event.data.data
+                
+                this.getBankNo('out')
+                this.showReadIc = false	
+            }
+            if(event.data.type == 'close') {
+                this.showReadIc = false	
+            }
+        }
+        if(event.data && event.data.path && event.data.path == 'unloadingReadIcin') {
+            if(event.data.type == 'data') {
+                this.icUuid = event.data.data
+                
+                this.getBankNo('in')
+                this.showReadIc = false	
+            }
+            if(event.data.type == 'close') {
+                this.showReadIc = false	
+            }
+        }
+    }, false)
+  },
+  activated(){
+      this.resetForm()
+      this.outInfo = {}
+      this.inInfo = {}
+      this.password = ''
+      this.isReadOut = false
+      this.isReadIn = false
+  },
+  methods: {
+      // 重置表单
+    resetForm() {
+      this.$refs["ruleForm"].resetFields();
+    },
+     // 读卡号
+      readBankNo(type) {
+        this.showReadIc = true
+        if(type == 'out'){
+          this.ruleForm.turnout_passbook_num = ''
+        }
+        if(type == 'in'){
+          this.ruleForm.turnin_passbook_num = ''
+        }
+        setTimeout(() =>{
+            document.getElementById('readIcIframeId').src='./static/autoGetCardSN.html?path=unloadingReadIc' +type;
+        },100)
+      },
+      // 根据IC芯片卡号获取卡号
+    getBankNo(type) {
+      let that = this;
+      that.ajax('searchICCard',{
+        uuid:that.icUuid
+      },'获取卡号失败',res => {
+          if (res.errno == 0) {
+            if(type == 'out'){
+              this.ruleForm.turnout_passbook_num = res.data.card
+            }
+            if(type == 'in'){
+              this.ruleForm.turnin_passbook_num = res.data.card
+            }
+            that.findcard(type)
+          }
+        });
+    },
+    // 自动换算大写金额
+    inputMoney() {
+      this.ruleForm.turnout_money = this.ruleForm.turnout_money.replace(/^(\-)*(\d+)\.(\d\d).*$/,'$1$2.$3')
+      this.daxiedrawMoney = this.$upDigit(this.ruleForm.turnout_money);
+    },
+
+    findcard(tag) {
+      let card = "";
+      if (tag == "out") {
+        if (this.ruleForm.turnout_passbook_num == "") {
+          this.$message.error("请输入转出账户");
+          return;
+        }
+        card = this.ruleForm.turnout_passbook_num;
+      }
+      if (tag == "in") {
+        if (this.ruleForm.turnin_passbook_num == "") {
+          this.$message.error("请输入转入账户");
+          return;
+        }
+        card = this.ruleForm.turnin_passbook_num;
+      }
+      this.ajax(
+        "searchCard",
+        { card: card },
+        "查询失败",
+        res => {
+          if (res.errno == 0) {
+            if(tag == 'out'){
+                if(res.data.passbook_status == 1){
+                  this.$message.success("查找完成");
+                this.isOut = true;
+                this.outInfo = res.data;
+                  this.isReadOut = false
+                }else if(res.data.passbook_status == 0){
+                  this.$message.error('该卡已挂失，请补卡')
+                  this.isReadOut = true
+                }else if(res.data.passbook_status == 2){
+                  this.$message.error('该卡已删除')
+                  this.isReadOut = true
+                }
+            }else{
+                if(res.data.passbook_status == 1){
+                  this.$message.success("查找完成");
+                  this.isIn = true;
+                  this.inInfo = res.data;
+                  this.isReadIn = false
+                }else if(res.data.passbook_status == 0){
+                  this.$message.error('该卡已挂失，请补卡')
+                  this.isReadIn = true
+                }else if(res.data.passbook_status == 2){
+                  this.$message.error('该卡已删除')
+                  this.isReadIn = true
+                }
+            }
+          }
+        },
+        err => {}
+      );
+    },
+
+    submitForm(formName) {
+      this.$refs[formName].validate(valid => {
+        if (valid) {
+          this.submitLoading = true;
+          if (!this.isOut) {
+            this.$message.error("请查询转出账户确认卡号是否存在");
+            return;
+          }else {
+            if(!this.outInfo.relation_id) {
+              this.$message.error("转出账户暂无社员关系");
+            }
+          }
+          if (!this.isIn) {
+            this.$message.error("请查询转入账户确认卡号是否存在");
+            return;
+          } else {
+            if(!this.inInfo.relation_id) {
+              this.$message.error("转入账户暂无社员关系");
+            }
+          }
+          let param = JSON.parse(JSON.stringify(this.ruleForm))
+          // param.turnout_passbook_num = this.outInfo.passbook_num;
+          // param.turnin_passbook_num = this.inInfo.passbook_num;
+          param.turnout_relation_id = this.outInfo.relation_id;
+          param.turnin_relation_id = this.inInfo.relation_id;
+          param.turnin_coopera_id = this.inInfo.coopera_id;
+          param.turnout_money = this.ruleForm.turnout_money;
+          param.pwd = this.utils.recursiveMD5(this.password, 1)
+          param.type = 3
+
+            this.ajax('turnMoney',param,'存入失败',res=>{
+              this.submitLoading = false;
+              if(res.errno == 0){
+                this.$message(res.errmsg)
+                this.resetForm()
+                this.inInfo = {}
+                this.outInfo = {}
+                this.password = ''
+                this.daxiedrawMoney = ''
+              }
+            },err=>{this.submitLoading = false;})
+        } else {
+          setTimeout(() => {
+            let isError = document.getElementsByClassName("is-error");
+            let firstErrInput = isError[0].querySelector("input");
+            if (firstErrInput.type == "file") {
+              document.querySelectorAll(
+                ".el-scrollbar__wrap"
+              )[1].scrollTop = 50;
+            } else {
+              firstErrInput.focus();
+            }
+          }, 100);
+          return false;
+        }
+      });
+    }
+  }
+};
+</script>
+<style lang="less">
+.unloading {
+  padding: 20px;
+  .tit-con {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    position: relative;
+    .shu {
+      width: 0.28rem;
+      height: 1rem;
+      background-color: #3b6af1;
+    }
+    .tit {
+      color: #444444;
+      padding: 0 0.8rem;
+      line-height: 1rem;
+    }
+    .bg {
+      flex: 1;
+      background: url("../../images/baseInfo/tit-bg.png");
+      height: 1rem;
+      background-size: 100% 100%;
+    }
+    .del-family-icon {
+      position: absolute;
+      right: 0;
+      top: 0.5rem;
+      height: 1.5rem;
+      cursor: pointer;
+    }
+  }
+
+  .form-item-con {
+    margin: 2rem 0;
+    position: relative;
+    .el-form-item {
+      width: 35%;
+      float: left;
+      height: 2.5rem;
+      .el-form-item__label {
+        font-size: 0.9rem;
+      }
+      .el-input {
+        width: 80%;
+        .read-idCard {
+          color: #3b6af1;
+          background: #f0f8ff;
+          font-size: 0.75rem;
+          cursor: pointer;
+        }
+        .read-idCard:active {
+          opacity: 0.6;
+        }
+      }
+      .el-select {
+        width: 80%;
+        .el-input {
+          width: 100%;
+        }
+      }
+    }
+    .upload-con {
+      width: 30%;
+      position: absolute;
+      top: 50%;
+      right: 0;
+      transform: translateY(-50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      .el-form-item__content {
+        margin-left: 0 !important;
+      }
+      .img-con {
+        max-width: 100%;
+        border: 1px solid #e4edf6;
+        border-bottom: 0;
+        padding: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 10rem;
+        height: 15rem;
+        cursor: pointer;
+        img {
+          max-width: 100%;
+          max-height: 100%;
+        }
+      }
+
+      .upload-btn {
+        width: 100%;
+        padding: 0.3rem 0;
+        background: #e4edf6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #3b6af1;
+        font-size: 0.9rem;
+        cursor: pointer;
+      }
+      .upload-btn:hover {
+        opacity: 0.6;
+      }
+    }
+  }
+  .el-pagination {
+    float: right;
+    margin-top: 30px;
+    margin-bottom: 30px;
+  }
+  .btn-con {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 5rem;
+    padding-bottom: 2rem;
+    .el-button {
+      width: 23%;
+      padding: 0.9rem;
+    }
+  }
+  .ic-iframe {
+        position: absolute;
+        top:50%;
+        left: 50%;
+        width: 500px;
+        height: 200px;
+        transform: translate(-50%,-70%);
+        background:#fff;
+        z-index: 999;
+        box-shadow: 0 0 10px #ccc;
+        border-radius: 8px;
+    }
+    .iframe-absolute-con {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.6)
+    }
+}
+</style>

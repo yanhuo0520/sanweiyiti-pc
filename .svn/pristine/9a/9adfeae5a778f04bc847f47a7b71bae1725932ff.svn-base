@@ -1,0 +1,590 @@
+<template>
+    <div class="mutualfundList" :class="{'admin-tmp-con': isAdmin}" v-loading="loading">
+      <template v-if="isAdmin">
+        <div class="breadcrumb-con">
+            <img class="left-icon" src="../../images/breadcrumb-left-icon.png" alt="">
+            <div class="breadcrumb-info">
+                <el-breadcrumb separator-class="el-icon-arrow-right">
+                    <el-breadcrumb-item>互助金业务</el-breadcrumb-item>
+                    <el-breadcrumb-item  class="breadcrumb-tit">互助金列表</el-breadcrumb-item>
+                </el-breadcrumb>
+            </div>
+          <el-button size="small" @click="initData()">刷新</el-button>
+        </div>
+        <div class="admin-con" v-loading="adminLoading">
+          <div class="org-menu-con">
+            <el-scrollbar wrap-class="scrollbar-wrapper">
+                <el-menu v-if="cooperativeList && cooperativeList.length > 0" class="el-menu-vertical-demo" :default-openeds="activeMenuArr" :default-active="activeMenu" @open="handleOpen" :unique-opened="true" background-color="#F8FCFF">
+                  <div v-for="(item,index) in cooperativeList" :key="index">
+                    <template v-if="item.count > 0">
+                      <el-submenu :index="index+''" :show-timeout="1000">
+                          <template slot="title">
+                            <el-tooltip class="item" :ref="'menu'+item.coopera_id" :disabled="item.disabled" @mouseenter.native="tipMouseenter(item)"  :content="item.coopera_name" placement="right-start">
+                              <div class="menu-title">{{item.coopera_name}}</div>
+                            </el-tooltip>
+                          </template>
+                          <el-menu-item v-for="(subItem,subIndex) in item.children" :index="(index+'-'+subIndex)" @click="clickMenuItem(subItem)" :key="subIndex">
+                            <template slot="title">
+                              <el-tooltip class="item" :ref="'menu'+subItem.coopera_id" effect="dark" :disabled="subItem.disabled" @mouseenter.native="tipMouseenter(subItem)" :content="subItem.coopera_name" placement="right-start">
+                                <div class="menu-item-title level2-title">
+                                  <!-- <div class="dot"></div>
+                                  <span>{{subItem.coopera_name}}</span> -->
+                                  {{subItem.coopera_name}}
+                                </div>
+                              </el-tooltip>
+                            </template>
+                          </el-menu-item>
+                      </el-submenu>
+                    </template>
+                    <template v-else>
+                        <el-menu-item :index="index+''" @click="clickMenuItem(item)">
+                          <el-tooltip class="item" :ref="'menu'+item.coopera_id" @mouseenter.native="tipMouseenter(item)" :disabled="item.disabled" effect="dark" :content="item.coopera_name" placement="right-start">
+                            <div class="menu-title">{{item.coopera_name}}</div>
+                          </el-tooltip>
+                        </el-menu-item>
+                    </template>
+                  </div>
+                </el-menu>
+                <div class="no-menu-con" v-else>
+                    <div class="menu-absolute-center">
+                        <span class="text">暂无合作社信息</span>
+                    </div>
+                </div>
+            </el-scrollbar>
+          </div>
+          <div class="right-con" >
+            <el-scrollbar wrap-class="scrollbar-wrapper">
+              <div class="operate-con clearfix">
+                  <div class="search-con"  >
+                      <el-form class="clearfix"  label-width="65px">
+                          <el-form-item label="日期">
+                            <el-date-picker v-model="date" type="daterange" range-separator="至" start-placeholder="开始日期"  end-placeholder="结束日期" value-format="yyyy-MM-dd"> </el-date-picker>
+                        </el-form-item>
+                        <el-form-item label="类型">
+                            <el-select v-model="type" placeholder="请选择类型" multiple >
+                                <el-option v-for="(item,index) in typeOptions" :key="index" :label="item.name" :value="item.id"></el-option>
+                            </el-select>
+                        </el-form-item>
+                        <el-form-item label="账号">
+                            <el-input placeholder="请输入合作社账户" v-model="passbook_num"></el-input>
+                        </el-form-item>
+                        <el-button style="margin-left:15px" type="primary" size="small" :loading="loading" @click="search()">{{loading ? '获取数据中...' : '查询'}}</el-button>
+                        <el-button type="primary" size="small" v-if="adminType == 3 && isPrint" >打印</el-button>
+                      </el-form>
+                  </div>
+              </div>
+              <div class="info-con">
+                  <el-table :data="tableData" v-if="tableData && tableData.length > 0" border>
+                    <el-table-column prop="log_id" label="ID" width="70" align="center"></el-table-column>
+                    <el-table-column prop="passbook_num" label="互助金卡号" align="center"></el-table-column>
+                    <el-table-column prop="log_type" label="记录类型" align="center">
+                        <template slot-scope="scope">
+                          {{scope.row.log_type == 0?'存款':scope.row.log_type == 1?'取款':scope.row.log_type == 2?'贷款':scope.row.log_type == 3?'还款':scope.row.log_type == 4?'活期利息增加 ':scope.row.log_type == 5?'合作社卡内部转入':scope.row.log_type == 6?'合作社卡内部转出':scope.row.log_type == 7?'红利':scope.row.log_type == 8?'合作社卡转出到银行卡':''}}
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="last_money" label="变动之前会员卡余额" align="center" width="150px"></el-table-column>
+                    <el-table-column prop="log_money" label="记录变动的金额" align="center">
+                        <template slot-scope="scope">
+                          {{(scope.row.log_type == 0 || scope.row.log_type == 4 || scope.row.log_type == 5 || scope.row.log_type == 7)?'+' + scope.row.log_money : (scope.row.log_type == 1 || scope.row.log_type == 6)?'-' + scope.row.log_money:scope.row.log_money}}
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="log_money" label="余额" align="center">
+                        <template slot-scope="scope">
+                            {{(scope.row.log_type == 0 || scope.row.log_type == 4 || scope.row.log_type == 5 || scope.row.log_type == 7)?(Number(scope.row.last_money) + Number(scope.row.log_money)):(scope.row.log_type == 1 || scope.row.log_type == 6)?(Number(scope.row.last_money) + Number(scope.row.log_money)):''}}
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="log_date" label="时间" align="center" width="150px"></el-table-column>
+                    <el-table-column prop="worker_name" label="柜员名字" align="center"></el-table-column>
+                  </el-table>
+                  <div class="page-con">
+                    <el-pagination @current-change="handleCurPageChange" v-if="totalPage && totalPage > 0" background :current-page="curPage" layout="prev, pager, next" :total="totalPage*10"> </el-pagination>
+                  </div>
+                  <div style="height:5rem"></div>
+                  <div v-if="!tableData || tableData.length == 0">
+                    <template v-if="!tableData || tableData.length == 0">
+                      <div class="no-data-con" >
+                          <div class="absolute-center">
+                              <div class="err-info-text ">暂无互助金列表</div>
+                          </div>
+                      </div>
+                    </template>
+                  </div>
+              </div>
+            </el-scrollbar>
+          </div>
+        </div>
+      </template>
+      <template v-else>
+        <div class="breadcrumb-con">
+            <img class="left-icon" src="../../images/breadcrumb-left-icon.png" alt="">
+            <div class="breadcrumb-info">
+                <el-breadcrumb separator-class="el-icon-arrow-right">
+                    <el-breadcrumb-item>互助金业务</el-breadcrumb-item>
+                    <el-breadcrumb-item  class="breadcrumb-tit">互助金列表</el-breadcrumb-item>
+                </el-breadcrumb>
+            </div>
+          <el-button size="small" @click="initData()">刷新</el-button>
+        </div>
+
+        <div class="search-con">
+            <el-form class="clearfix"  label-width="70px">
+              <el-form-item label="合作社" v-if="isAdmin" >
+                  <el-select v-model="cooperaId" filterable placeholder="请选择合作社">
+                      <el-option v-for="(item,index) in cooperativeList" :key="index" :label="item.coopera_name" :value="item.coopera_id"></el-option>
+                  </el-select>
+              </el-form-item>
+                <el-form-item label="日期">
+                    <el-date-picker
+                        v-model="date"
+                        type="daterange"
+                        range-separator="至"
+                        start-placeholder="开始日期"
+                        end-placeholder="结束日期"
+                        value-format="yyyy-MM-dd">
+                        </el-date-picker>
+                </el-form-item>
+                <el-form-item label="类型">
+                    <el-select v-model="type" placeholder="请选择类型" multiple >
+                        <el-option v-for="(item,index) in typeOptions" :key="index" :label="item.name" :value="item.id"></el-option>
+                    </el-select>
+                </el-form-item>
+                <el-form-item label="账号">
+                    <el-input placeholder="请输入合作社账户" v-model="passbook_num"></el-input>
+                </el-form-item>
+                <el-button type="primary" size="small" :loading="loading" @click="search()">{{loading ? '获取数据中...' : '查询'}}</el-button>
+                <el-button type="primary" size="small" v-if="!isAdmin && isPrint" >打印</el-button>
+            </el-form>
+        </div>
+        <div class="table-con">
+            <div>
+              <el-table :data="tableData" v-if="tableData && tableData.length > 0" border>
+                <el-table-column prop="log_id" label="ID" width="100%"></el-table-column>
+                <el-table-column prop="passbook_num" label="互助金卡号" ></el-table-column>
+                <el-table-column prop="log_type" label="记录类型" >
+                    <template slot-scope="scope">
+                      {{scope.row.log_type == 0?'存款':scope.row.log_type == 1?'取款':scope.row.log_type == 2?'贷款':scope.row.log_type == 3?'还款':scope.row.log_type == 4?'活期利息增加 ':scope.row.log_type == 5?'合作社卡内部转入':scope.row.log_type == 6?'合作社卡内部转出':scope.row.log_type == 7?'红利':scope.row.log_type == 8?'合作社卡转出到银行卡':''}}
+                    </template>
+                </el-table-column>
+                <el-table-column prop="last_money" label="变动之前会员卡余额" ></el-table-column>
+                <el-table-column prop="log_money" label="记录变动的金额" >
+                    <template slot-scope="scope">
+                      {{(scope.row.log_type == 0 || scope.row.log_type == 4 || scope.row.log_type == 5 || scope.row.log_type == 7)?'+' + scope.row.log_money : (scope.row.log_type == 1 || scope.row.log_type == 6)?'-' + scope.row.log_money:scope.row.log_money}}
+                    </template>
+                </el-table-column>
+                <el-table-column prop="log_money" label="余额" >
+                    <template slot-scope="scope">
+                        {{(scope.row.log_type == 0 || scope.row.log_type == 4 || scope.row.log_type == 5 || scope.row.log_type == 7)?(Number(scope.row.last_money) + Number(scope.row.log_money)):(scope.row.log_type == 1 || scope.row.log_type == 6)?(Number(scope.row.last_money) + Number(scope.row.log_money)):''}}
+                    </template>
+                </el-table-column>
+                <el-table-column prop="log_date" label="时间" ></el-table-column>
+                <el-table-column prop="worker_name" label="柜员名字" ></el-table-column>
+                </el-table>
+
+                <el-pagination
+                background
+                :current-page="curPage"
+                layout="prev, pager, next"
+                :total="totalPage*10"
+                @current-change="handleCurPageChange">
+                </el-pagination>
+            </div>
+            <div v-if="!tableData || tableData.length == 0">
+                <div class="no-data-con" >
+                    <div class="absolute-center">
+                        <div class="err-info-text ">暂无信息</div>
+                    </div>
+                </div>
+            </div>
+          </div>
+      </template>      
+    </div>
+</template>
+<script>
+export default {
+  name: "mutualfundList",
+  data() {
+    return {
+      tableData: [],
+      curPage: 1,
+      totalPage: 1,
+      loading:false,
+
+      date:'',
+      type:'',
+      typeOptions:[{
+          id:0,
+          name:'存款'
+      },{
+          id:1,
+          name:'取款'
+      },{
+          id:4,
+          name:'活期利息增加'
+      },{
+          id:5,
+          name:'合作社卡内部转入'
+      },{
+          id:6,
+          name:'合作社卡内部转出'
+      },{
+          id:7,
+          name:'红利'
+      },{
+          id:8,
+          name:'合作社卡转出到银行卡'
+      }],
+      passbook_num:'',
+      lastSearch:'',
+
+      isAdmin: false, // 是否为管理员
+      adminType: '', // 管理员类型
+      cooperaId: '', //合作社id
+      cooperativeList:[],
+      
+      isPrint:false,// 是否有打印权限
+
+      activeMenu: '0',
+      activeMenuArr: [],
+      adminLoading: false,
+      cooperationInfo: '',
+    };
+  },
+  activated() {
+     this.tableData = [];
+    this.curPage = 1;
+    this.loading = true;
+      this.passbook_num = ''
+      this.lastSearch = ''
+      this.date = ''
+      this.type = ''
+     //判断是否为管理员
+    let adminType = localStorage.getItem('is_admin')
+    if(adminType && Number(adminType) >= 1) {
+      this.isAdmin = true
+      this.adminType = adminType
+    }
+    if(this.isAdmin) {
+        this.utils.getCooperativeList(this, data =>{
+        if(data && data.length > 1 && adminType == 3) {
+            this.cooperaId = data[1].coopera_id
+        } else {
+            this.cooperaId = ''
+        }
+        data.forEach(item =>{
+            item.children = []
+            item.disabled = true
+        })
+        this.cooperativeList = data
+        this.initActive()
+        this.amountList()
+      },err =>{
+          this.loading = false
+      })
+    } else {
+      this.amountList();
+    }
+    this.handlePermission()
+   
+  },
+  methods: {
+    initData(){
+      this.tableData = [];
+      this.curPage = 1;
+      this.passbook_num = ''
+      this.lastSearch = ''
+      this.date = ''
+      this.type = ''
+       if(this.cooperativeList && this.cooperativeList.length > 1 && this.adminType == 3) {
+            this.cooperaId = this.cooperativeList[1].coopera_id
+        } else {
+            this.cooperaId = ''
+        }
+        this.initActive()
+      this.amountList();
+    },
+    // 初始化默认合作社
+    initActive() {
+      if(this.adminType == 3) {
+         if(!this.cooperativeList || this.cooperativeList.length < 1) return
+         this.activeMenu = '-1'
+          this.$nextTick(() =>{
+            this.activeMenu = '1'
+          })
+        // this.getLevel2Data('1',() =>{
+        //     this.$nextTick(() =>{
+        //       this.activeMenu = '1-0'
+        //     })
+        // })
+      } else {
+        // 勿删 直接赋值为0不起作用
+        this.activeMenu = '-1'
+        this.$nextTick(() =>{
+          this.activeMenu = '0'
+          this.activeMenuArr = []
+        })
+      }
+    },
+    // 合作社导航展开
+    handleOpen(index) {
+      if(this.cooperativeList[index].children.length > 0) return
+      this.getLevel2Data(index)
+    },
+    // 获取子级合作社列表
+    getLevel2Data(index, callBack){
+      this.ajax(
+        "cooperativeLevelList",{ parent_id: this.cooperativeList[index].coopera_id },"获取合作社列表失败",res => {
+          if (res.errno == 0) {
+            res.data.forEach(item  =>{
+              item.disabled = true
+            })
+            this.activeMenu = index
+              this.cooperativeList[index].children = res.data
+
+              callBack && typeof callBack == 'function' && callBack()
+          } else {
+              this.cooperativeList[index].children = []
+          }
+        },err => {
+            this.cooperativeList[index].children = []
+        }
+      );
+    },
+    // 点击合作社获取数据
+    clickMenuItem(item) {
+      
+      if(this.cooperaId) {
+        if(this.cooperaId == item.coopera_id) return
+      }
+      this.tableData = []
+      this.curPage = 1
+      this.totalPage = null
+      this.cooperaId = item.coopera_id
+      this.amountList()
+    },
+    // dom移动事件
+    tipMouseenter(item) {
+      let isOverflow = this.$refs['menu'+item.coopera_id];
+      let cWidth = isOverflow[0].$el.clientWidth;
+      let sWidth = isOverflow[0].$el.scrollWidth;
+      if (sWidth > cWidth) { //超过 
+      this.$set(item, 'disabled', false);
+      } else {
+        this.$set(item, 'disabled', true);
+      }
+    },
+    // 判断当前页面都有什么权限
+    handlePermission() { 
+      let that = this;
+      that.utils.getPermissionList(that,data =>{
+        data.forEach(item =>{
+          if(item.title == '打印') {
+            that.isPrint = true
+          }	
+        })
+      })
+    },
+    amountList() {
+        let type = this.type
+        let str = ''
+        if(type != ''){
+            type.forEach(element => {
+                str += element + ','
+            });
+        }
+        if(this.isAdmin) {
+          this.adminLoading = true
+        } else {
+          this.loading = true
+        }
+        
+      this.ajax(
+        "mutualfundMoneyAll",
+        {
+            page:this.curPage,
+            size:10,
+            start: this.date != null?this.date[0]: '',
+            end: this.date != null?this.date[1]: '',
+            passbook_num: this.passbook_num,
+            log_type: str.substring(0,str.length - 1),
+            coopera_id: this.cooperaId
+        },
+        "查询失败",
+        res => {
+          this.loading = false
+          this.adminLoading = false
+          if (res.errno == 0) {
+            this.tableData = res.data.data
+            this.curPage = Number(res.data.current_page);
+            this.totalPage = res.data.total;
+            this.lastSearch = this.date+JSON.stringify(this.type)+this.passbook_num
+          }
+        },
+        err => {
+          this.adminLoading = false
+          this.loading = false
+        }
+      );
+    },
+    handleCurPageChange(val){
+        this.curPage = val;
+        this.amountList()
+    },
+
+    // 查询
+	search() {
+       this.curPage = 1;
+        this.totalPage = null;
+        this.data = [];
+        this.amountList()
+	},
+  }
+};
+</script>
+<style lang="less">
+.mutualfundList {
+  padding: 20px;
+  .el-pagination {
+    float: right;
+    margin-top: 30px;
+    margin-bottom: 30px;
+  }
+  .el-select{
+      width: 100%;
+  }
+
+  .search-con {
+      margin-bottom: 10px;
+    .el-form {
+      width: 100%;
+      display: flex;
+    }
+    .el-form-item {
+      width: 25%;
+      // float: left;
+      margin-bottom: 0;
+      .el-form-item__label {
+        font-size: 0.9rem;
+      }
+      .el-form-item__content {
+        margin-right: 30px;
+        .el-input {
+          width: 100%;
+          .read-idCard {
+            color: #3b6af1;
+            background: #f0f8ff;
+            font-size: 0.75rem;
+            cursor: pointer;
+          }
+        }
+      }
+    }
+  }
+}
+.admin-tmp-con { 
+  padding: 0;
+  width: 100%; 
+  height: 100%; 
+  display: flex;
+  flex-direction: column;
+  .breadcrumb-con {
+    margin-bottom: 0;
+  }
+  .admin-con {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    .org-menu-con {
+      width: 16rem;
+      height: 100%;
+      background: #F8FCFF;
+      .level2-title {
+          color: #8F9BA7;
+      }
+      .level2-title::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 35px;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #8F9BA7;
+        transform: translateY(-50%);
+      }
+      .is-opened {
+        .el-icon-arrow-down {
+          color: #409EFF;
+        }
+        .is-active {
+          .level2-title {
+            color: #409EFF;
+          }
+          .level2-title::after {
+            background: #409EFF;
+          }
+        }
+        
+      }
+      .is-active {
+        background: #fff!important;
+      }
+      .menu-title {
+        width: 10rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .menu-item-title {
+        width: 7.5rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .no-menu-con {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        .menu-absolute-center {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%,-50%);
+          .text {
+            font-size: 0.9rem;
+            color: #999;
+
+          }
+        }
+      }
+    }
+    .right-con {
+      position: relative;
+      width: calc(100% - 16rem);
+      height: 99%;
+      padding: 10px;
+      .info-con {
+        position: relative;
+        width: 100%;
+        padding-top: 10px;
+      }
+      .operate-con {
+        padding: 0;
+      }
+      .operate-con+.el-table {
+        margin-top: 10px;
+      }
+    }
+    
+    .hide-menu {
+      width: 54px;
+    }
+    .page-con {
+      position: absolute;
+      bottom: 0;
+      right: 5rem;
+    }
+  }
+}
+</style>

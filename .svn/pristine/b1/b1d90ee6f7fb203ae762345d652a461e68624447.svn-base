@@ -1,0 +1,409 @@
+<template>
+    <div class="passbook-term-list" v-loading="loading">
+		<div class="breadcrumb-con">
+			<img class="left-icon" src="../../images/breadcrumb-left-icon.png" alt="">
+			<div class="breadcrumb-info">
+				<el-breadcrumb separator-class="el-icon-arrow-right">
+					<el-breadcrumb-item>系统配置</el-breadcrumb-item>
+					<el-breadcrumb-item  class="breadcrumb-tit">互助金利率配置</el-breadcrumb-item>
+				</el-breadcrumb>
+			</div>
+			<el-button size="small" @click="initData()">刷新</el-button>
+		</div>
+		<div class="operate-con clearfix">
+			<div class="btn-con" v-if="!loading">
+				<el-button slot="trigger" size="small" v-if="isAdd"  type="primary" @click="addEditCapital(1)">添加利率</el-button>
+			</div>
+		</div>
+        <div class="table-con" >
+            <template v-if="data && data.length > 0">
+                <el-table :data="data" border >
+                    <el-table-column prop="id" label="ID" width="60" align="center" ></el-table-column>
+                    <el-table-column prop="type_name" label="存入类型" align="center"></el-table-column>
+                    <el-table-column prop="term_name" label="存入期限" align="center"></el-table-column>
+                    <el-table-column prop="rate" label="利率‰" align="center"></el-table-column>
+					<el-table-column prop="add_time" label="创建时间" align="center"></el-table-column>
+                    <el-table-column  label="操作"  align="center" v-if="isDel || isEdit" :width="(isDel && isEdit) ? '180' : '90'">
+                    <template slot-scope="scope">
+                        <el-button type="primary" plain size="small" v-if="isEdit" @click="addEditCapital(2,scope.row,scope.$index)" >编辑</el-button>
+                        <el-button type="danger" plain size="small"  v-if="isDel"  @click="delCapital(scope.row,scope.$index)">删除</el-button>
+                    </template>
+                </el-table-column>
+                </el-table>
+            </template>
+            <template v-if="!data || data.length == 0">
+                <div class="no-data-con" >
+                    <div class="absolute-center">
+                        <div class="err-info-text ">暂无估计利率列表</div>
+                    </div>
+                </div>
+            </template>
+        </div>
+		<el-dialog :title="capitalType == 1 ? '添加互助金利率' : '编辑互助金利率'" :visible.sync="ruleFormDialog" class="product-dialog">
+			<el-form  ref="ruleForm"  :model="ruleForm" :rules="capitalRules" label-width="100px" class="product-form clearfix" >
+				<el-form-item label="存入类型:" prop="type_id">
+					<el-select v-model="ruleForm.type_id" placeholder="请选择存入类型" @change="capitalTypeChange"  :disabled="capitalType == 2">
+						<el-option v-for="(item,index) in capitalTypeOptions" :label="item.type_name" :value="item.id" :key="index"></el-option>
+					</el-select>
+				</el-form-item>
+				<el-form-item label="存款期限标识:" prop="sign" v-if="ruleForm.type_id == 2">
+					<el-select v-model="ruleForm.sign" placeholder="请选择存款期限标识">
+						<el-option label="年" value="1"></el-option>
+						<el-option label="月" value="2"></el-option>
+						<el-option label="日" value="3"></el-option>
+					</el-select>
+				</el-form-item>
+				<el-form-item label="存款期限" prop="number"  v-if="ruleForm.type_id == 2">
+					<el-input v-model="ruleForm.number" placeholder="请输入数字" ></el-input>
+				</el-form-item>
+                <el-form-item label="存款利率‰:" prop="rate">
+					<el-input v-model="ruleForm.rate" placeholder="请输入存款利率" @input="handlePrice"></el-input>
+				</el-form-item>
+			</el-form>
+			<div slot="footer" class="dialog-footer">
+				<el-button @click="ruleFormDialog = false">取 消</el-button>
+				<el-button type="primary" @click="capitalSubmit('ruleForm')" :loading="capitalSubmitLoading">确 定</el-button>
+			</div>
+		</el-dialog>
+    </div>
+</template>
+<script>
+export default {
+  name: "passbookTermList",
+  data() {
+	var checkNum = (rule, value, callback) => {
+        if (!value) {
+            return callback(new Error('请输入一个数字'));
+        }
+        let numReg = /^[0-9]*[1-9][0-9]*$/;
+        if (!numReg.test(value)) {
+        callback(new Error('请输入正确的数字'));
+        } else {
+            callback();
+        }
+	};
+	var checkLoanRate = (rule, value, callback) => {
+        if (!value) {
+            return callback(new Error('请输入利率'));
+        }
+        let loanRateReg = /^\d+$|^\d*\.\d+$/;
+        if (!loanRateReg.test(value)) {
+        callback(new Error('请输入正确的利率'));
+        } else {
+            callback();
+        }
+    };
+    return {
+	  data: [],
+	  loading: false,
+	
+	  capitalType: '',
+	  ruleFormDialog: false, //股金利率form表单弹窗
+	  capitalTypeOptions: [], // 存入类型列表
+	  capitalIndex: '', // 当前操作编辑利率列表的下标
+	  ruleForm: {
+		  rate: '',
+		  number: '',
+		  sign: '1',
+		  type_id: '',
+	  },
+	  capitalRules: {
+		  rate: [
+            { required: true, validator: checkLoanRate, trigger: 'input' }
+		  ],
+		   type_id: [
+            { required: true, message: '请选择存入类型', trigger: 'change' }
+		  ],
+		   sign: [
+            { required: true, message: '请选择存款标识', trigger: 'change' }
+		  ],
+		   number: [
+            { required: true, validator: checkNum, trigger: 'change' }
+		  ],
+	  },
+	  capitalSubmitLoading: false,
+
+	  isEdit: false,// 是否有编辑权限
+      isDel: false, //是否有删除权限
+      isAdd: false, //是否有添加权限
+
+    };
+  },
+  activated() {
+	  this.initData()
+  },	
+  methods: {
+	   handlePrice(val) {
+		  val = this.utils.handlePrice(val)
+		  this.ruleForm.rate = val
+	  },
+	// 初始化信息
+	initData() {
+      this.data = []
+	  this.ruleFormDialog = false
+	  this.getPassbookTermLists()
+	  this.handlePermission()
+	},
+	// 判断当前页面都有什么权限
+	handlePermission() { 
+		let that = this;
+		that.utils.getPermissionList(that,data =>{
+			data.forEach(item =>{
+				if(item.title == '编辑') {
+					that.isEdit = true
+                }	
+                if(item.title == '删除') {
+					that.isDel = true
+                }	
+                if(item.title == '添加') {
+					that.isAdd = true
+				}	
+			})
+		})
+	},
+	// 获取股金利率列表
+	getPassbookTermLists(isAddEdit) {
+		let that = this
+		if(isAddEdit) {
+			that.loading = false;
+		} else {
+			that.loading = true;
+		}
+		that.ajax('passbookTermLists',{},'获取股金利率列表失败',res =>{
+			that.loading = false
+			if(res.errno == 0) {
+                res.data.data.forEach(item =>{
+                    item.sign = JSON.stringify(item.sign)
+                })
+				that.data = res.data.data
+				if(!isAddEdit) {
+                    that.getPassbookType()
+                }
+			}
+		}, err =>{
+			that.loading = false
+		})
+	},
+	// 获取存入类型列表
+	getPassbookType() {
+        let that = this;
+        that.ajax('passbookType',{},'获取存入类型失败',res =>{
+			if(res.errno == 0) {
+               if(res.data && res.data.length > 0) {
+                that.ruleForm.type_id = res.data[0].id
+                that.capitalTypeOptions =  res.data
+               }
+			}
+		})
+	  },
+	// 添加编辑产品
+	addEditCapital(type,row,index) { // type 1-添加 2-编辑
+		if(type == 1) {
+			this.ruleForm = {
+				rate: '',
+				number: '',
+				sign: '3',
+				type_id: this.capitalTypeOptions && this.capitalTypeOptions.length > 0 ? this.capitalTypeOptions[0].id : '',
+				term_name: '',
+			}
+		} else {
+			this.capitalIndex = index
+			this.ruleForm = {
+                rate: row.rate,
+                number: row.number,
+                sign: row.sign,
+                term_name: row.term_name,
+                type_id: row.type_id,
+                id: row.id
+			}
+			if(row.type_id == 3) {
+				this.ruleForm = {
+					rate: row.rate,
+					number: '',
+					sign: '3',
+					term_name: row.term_name,
+					type_id: 3,
+					id: row.id
+				}
+			}
+			
+		}
+		this.capitalType = type
+		this.ruleFormDialog = true
+	},
+	// 选择存入类型
+	capitalTypeChange(val) { // 2-定期 3-活期
+		if(val == 2) {
+			this.ruleForm = {
+                rate: '',
+                number: '',
+                sign: '1',
+                type_id: 2,
+                term_name: '',
+			}
+		} else if(val == 3) {
+			this.ruleForm = {
+                rate: '',
+                number: '',
+                sign: '3',
+                type_id: 3,
+                term_name: '',
+			}
+		}
+	},
+	// 添加编辑产品提交
+	capitalSubmit(formName) {
+		let that = this;
+		let type = that.capitalType
+		that.$refs[formName].validate((valid) => {
+          if (valid) {
+              that.capitalSubmitLoading = true
+              let numText = that.utils.noToChinese(that.ruleForm.number) 
+              if(parseFloat(that.ruleForm.number) >= 10 && parseFloat(that.ruleForm.number) <= 19) {
+                numText = numText.substring(1,3)
+              }
+			  that.ruleForm.term_name = numText+ (that.ruleForm.sign == '1' ? '年' : that.ruleForm.sign == '2' ? '个月' : '天')
+			  
+              let params = JSON.parse(JSON.stringify(that.ruleForm))
+              that.ajax((type == 1 ? 'passbookTermAdd' : 'passbookTermMod'),params,(type == 1 ? '添加' : '编辑')+ '失败',res =>{
+                that.capitalSubmitLoading = false
+                if(res.errno == 0) {
+					that.$message.success((type == 1 ? '添加' : '编辑')+'成功')
+					that.getPassbookTermLists(true)
+					that.resetForm(formName)
+					that.ruleFormDialog = false
+                }
+              }, err =>{
+                   that.capitalSubmitLoading = false
+              })
+          } else {
+            setTimeout(()=>{
+                let isError= document.getElementsByClassName("is-error");
+                let firstErrInput = isError[0].querySelector('input')
+				firstErrInput.focus();
+            },100);
+            return false;
+          }
+        });
+	},
+	//删除产品
+	delCapital(row,index) {
+		let that = this;
+		that.$confirm('此操作将永久删除该利率, 是否继续?', '提示', {
+			confirmButtonText: '确定',
+			cancelButtonText: '取消',
+			type: 'warning',
+			center: true
+			}).then(() => {
+				that.ajax('passbookTermDel',{
+					passbook_id: row.id
+				},'删除失败',res =>{
+					if(res.errno == 0) {
+						that.$message.success('删除成功')
+						that.data.splice(index,1)
+						if(that.data && that.data.length == 0) {
+							that.getPassbookTermLists()
+						}	
+					}
+				}, err =>{
+				})
+			}).catch(() => {});
+	},
+	// 重置form表单
+      resetForm(formName) {
+        this.$refs[formName].resetFields();
+      }
+  }
+};
+</script>
+<style lang="less">
+.passbook-term-list {
+  padding: 20px;
+  .el-pagination{
+        float: right;
+        margin-top: 30px;
+        margin-bottom: 30px;
+	}
+	.operate-con {
+	  padding: 10px 0;
+    .search-con {
+	  float: left;
+	  width: 80%;
+	  .el-form-item {
+		width: 28%;
+		float: left;
+		margin-bottom: 0;
+		.el-form-item__label {
+			font-size: 0.9rem;
+		}
+		.el-form-item__content {
+			margin-right: 30px;
+			.el-input {
+			width: 100%;
+			.read-idCard {
+				color: #3B6AF1;
+				background: #F0F8FF;
+				font-size: 0.75rem;
+				cursor: pointer;
+			}
+		}
+		}
+		
+	}
+    }
+    .btn-con {
+      float:right;
+    }
+  }
+    .table-con {
+		.inner-table-tit-con {
+			display: flex;
+			align-content: center;
+			justify-content: space-between;
+			.inner-table-tit {
+				flex: 1;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-weight: bold;
+				font-size: 1.2rem;
+				padding-bottom: 1.25rem;
+				text-align: center;
+				.btn-con {
+					display: flex;
+					align-items: center;
+					justify-content: center;
+				}
+			}
+		}	
+        
+        .inner-table {
+            thead {
+                tr th{
+                    background: #f9f9f9!important;
+                }
+            }
+        }
+	}
+	.product-dialog {
+		.product-form {
+			.el-form-item {
+				width: 45%;
+				float: left;
+			}
+		}
+	}
+	.rate-dialog {
+		.el-dialog {
+			width: 30%;
+		}
+		.rate-form {
+			.el-form-item {
+				// width: 60%;
+			}
+		}
+	}
+ 
+}
+
+</style>

@@ -1,0 +1,375 @@
+<template>
+    <div class="propertyForm" v-loading="loading">
+        <div class="breadcrumb-con">
+            <img class="left-icon" src="../../images/breadcrumb-left-icon.png" alt="">
+            <div class="breadcrumb-info">
+                <el-breadcrumb separator-class="el-icon-arrow-right">
+                    <el-breadcrumb-item>监管查询报表</el-breadcrumb-item>
+                    <el-breadcrumb-item class="breadcrumb-tit">盈余及盈余分配表</el-breadcrumb-item>
+                </el-breadcrumb>
+            </div>
+          <el-button size="small" @click="initData()">刷新</el-button>
+        </div>
+
+        <div class="search-con">
+            <el-form class="clearfix"  label-width="80px">
+                <el-form-item label="机构名称">
+                    <el-input placeholder="请输入机构名称" v-model="coopera_name"></el-input>
+                </el-form-item>
+                <el-form-item label="报表日期">
+                    <el-date-picker
+                    v-model="date"
+                    type="date"
+                    value-format="yyyy-MM-dd"
+                    placeholder="选择日期">
+                    </el-date-picker>
+                </el-form-item>
+                <el-button type="primary" size="small" :loading="loading">{{loading ? '获取数据中...' : '查询'}}</el-button>
+            </el-form>
+        </div>
+
+        <div class="table-con">
+            <div>
+              <el-table
+              :data="tableData"
+              max-height="550"
+              style="width: 100%"
+               v-if="tableData && tableData.length > 0">
+                <el-table-column prop="title" label="资产" ></el-table-column>
+                <el-table-column prop="caozuo" label="操作" ></el-table-column>
+                <el-table-column prop="nianchu" label="年初数" ></el-table-column>
+                <el-table-column prop="qimo" label="期末数" ></el-table-column>
+                <el-table-column prop="fuzhai" label="负债及所有者权益" ></el-table-column>
+                <el-table-column prop="caozuo1" label="操作" ></el-table-column>
+                <el-table-column prop="nianchu1" label="年初数" ></el-table-column>
+                <el-table-column prop="qimo1" label="期末数" ></el-table-column>
+              </el-table>
+
+              <!-- <el-pagination
+              background
+              :current-page="curPage"
+              layout="prev, pager, next"
+              :total="totalPage*10"
+              @current-change="handleCurPageChange">
+              </el-pagination> -->
+          </div>
+          <div v-if="!tableData || tableData.length == 0">
+              <div class="no-data-con" >
+                  <div class="absolute-center">
+                      <div class="err-info-text ">暂无信息</div>
+                  </div>
+              </div>
+          </div>
+        </div>
+    </div>
+</template>
+<script>
+export default {
+  name: "propertyForm",
+  data() {
+    return {
+      tableData: [
+        {
+          title: "流动资产:",
+          caozuo: '',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'流动负债',
+          caozuo1: '',
+          nianchu1: '',
+          qimo1: '',
+        },
+        {
+          title: "货币基金",
+          caozuo: '+',
+          nianchu: 0,
+          qimo: 0,
+          fuzhai:'短期借款',
+          caozuo1: '+',
+          nianchu1: '',
+          qimo1: '',
+        },
+        {
+          title: "流动性准备金",
+          caozuo: '+',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'社员互助金',
+          caozuo1: '+',
+          nianchu1: 0,
+          qimo1: 0,
+        },
+        {
+          title: "社员投放金",
+          caozuo: '+',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'应付互助金分红',
+          caozuo1: '+',
+          nianchu1: 0,
+          qimo1: 0,
+        },
+        {
+          title: "减：互助金损失准备",
+          caozuo: '+',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'应付股利',
+          caozuo1: '+',
+          nianchu1: '',
+          qimo1: '',
+        },
+        {
+          title: "社员投放金净值",
+          caozuo: '+',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'应付工资',
+          caozuo1: '+',
+          nianchu1: '',
+          qimo1: '',
+        },
+        {
+          title: "应收款项",
+          caozuo: '+',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'应交税费',
+          caozuo1: '+',
+          nianchu1: '',
+          qimo1: '',
+        },
+        {
+          title: "存货",
+          caozuo: '+',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'应付盈余返还',
+          caozuo1: '+',
+          nianchu1: '',
+          qimo1: '',
+        },
+        {
+          title: "流动资产合计",
+          caozuo: '',
+          nianchu: 0,
+          qimo: 0,
+          fuzhai:'应付剩余盈余',
+          caozuo1: '+',
+          nianchu1: '',
+          qimo1: '',
+        },
+        {
+          title: "长期资产",
+          caozuo: '',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'其他应付款',
+          caozuo1: '+',
+          nianchu1: '',
+          qimo1: '',
+        },
+        {
+          title: "对外投资",
+          caozuo: '+',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'流动负债合计',
+          caozuo1: '',
+          nianchu1: 0,
+          qimo1: 0,
+        },
+        {
+          title: "固定资产",
+          caozuo: '',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'长期负债',
+          caozuo1: '',
+          nianchu1: '',
+          qimo1: '',
+        },
+        {
+          title: "固定资产原值",
+          caozuo: '+',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'长期借款',
+          caozuo1: '+',
+          nianchu1: '',
+          qimo1: '',
+        },
+        {
+          title: "减：累计折旧",
+          caozuo: '+',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'专项应付款',
+          caozuo1: '+',
+          nianchu1: '',
+          qimo1: '',
+        },
+        {
+          title: "固定资产净值",
+          caozuo: '+',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'长期负债合计',
+          caozuo1: '',
+          nianchu1: '',
+          qimo1: '',
+        },
+        {
+          title: "固定资产清理",
+          caozuo: '+',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'负债合计',
+          caozuo1: '',
+          nianchu1: 0,
+          qimo1: 0,
+        },
+        {
+          title: "在建工程",
+          caozuo: '+',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'所有者权益',
+          caozuo1: '',
+          nianchu1: '',
+          qimo1: '',
+        },
+        {
+          title: "固定资产合计",
+          caozuo: '',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'成员股金',
+          caozuo1: '+',
+          nianchu1: 0,
+          qimo1: 0,
+        },
+        {
+          title: "其他资产",
+          caozuo: '',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'专项基金',
+          caozuo1: '+',
+          nianchu1: '',
+          qimo1: '',
+        },
+        {
+          title: "无形资产",
+          caozuo: '+',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'资本公积',
+          caozuo1: '+',
+          nianchu1: '',
+          qimo1: '',
+        },
+        {
+          title: "长期资产合计",
+          caozuo: '',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'盈余公积',
+          caozuo1: '+',
+          nianchu1: '',
+          qimo1: '',
+        },
+        {
+          title: "资产总计",
+          caozuo: '',
+          nianchu: 0,
+          qimo: 0,
+          fuzhai:'一般准备',
+          caozuo1: '+',
+          nianchu1: '',
+          qimo1: '',
+        },
+        {
+          title: "",
+          caozuo: '',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'未分配盈余',
+          caozuo1: '+',
+          nianchu1: 0,
+          qimo1: 0,
+        },
+        {
+          title: "",
+          caozuo: '',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'所有者权益合计',
+          caozuo1: '',
+          nianchu1: 0,
+          qimo1: 0,
+        },
+        {
+          title: "",
+          caozuo: '',
+          nianchu: '',
+          qimo: '',
+          fuzhai:'负债和所有者权益合计',
+          caozuo1: '',
+          nianchu1: 0,
+          qimo1: 0,
+        },
+      ],
+      curPage: 1,
+      totalPage: 1,
+      loading: false,
+      coopera_name: "",
+      date:""
+    };
+  },
+  methods: {
+    handleCurPageChange(val) {}
+  }
+};
+</script>
+<style lang="less">
+.propertyForm {
+  padding: 20px;
+  .el-pagination {
+    float: right;
+    margin-top: 30px;
+    margin-bottom: 30px;
+  }
+
+  .search-con {
+    margin-bottom: 10px;
+    .el-form {
+      width: 100%;
+      display: flex;
+    }
+    .el-form-item {
+      width: 20%;
+      // float: left;
+      margin-bottom: 0;
+      .el-form-item__label {
+        font-size: 0.9rem;
+      }
+      .el-form-item__content {
+        margin-right: 30px;
+        .el-input {
+          width: 100%;
+          .read-idCard {
+            color: #3b6af1;
+            background: #f0f8ff;
+            font-size: 0.75rem;
+            cursor: pointer;
+          }
+        }
+      }
+    }
+  }
+  .el-table__expanded-cell[class*="cell"] {
+    padding: 0;
+  }
+}
+</style>

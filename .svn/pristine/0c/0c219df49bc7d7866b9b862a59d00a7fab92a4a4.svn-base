@@ -1,0 +1,862 @@
+<template>
+    <div class="nav-menu">
+        <div class="top-con">
+            <div class="top-nav">
+                <div class="logo-con" @click="toIndex()">
+                    <div class="logo-text">三位一体</div>
+                    <div class="desc">后台管理系统</div>
+                </div>
+                <div class="nav-con">
+                    <div class="nav-item" :class="{'nav-active-item' : item.active}" v-for="(item,index) in navArr" :key="index" @click="clickTopNavItem(item)">
+                        <img :src="item.icon" alt=""> 
+                        <span>{{item.name}}</span>
+                    </div>
+                    <div class="nav-item" :class="{'nav-active-item' : isChat}"  @click="toChat()">
+                        <img src="" alt=""> 
+                        <span>对话</span>
+                    </div>
+                </div>
+                <div class="manage-con">
+                    <div class="manage-item account" @click="accountManage()">
+                        <img src="../images/public/account-icon.png" alt="">
+                        <span>账号管理</span>
+                    </div>
+                    <div class="manage-item logout" @click="logout()">
+                        <img src="../images/public/logout-icon.png" alt="">
+                        <span>退出系统</span>
+                    </div>
+                </div>
+            </div>
+            <div class="placeholder"></div>
+        </div>
+        <div class="left-routes-con">
+            <div class="routes-con">
+                <div class="user-info">
+                    <img class="header" src="../images/public/default-avatar.png" alt="">
+                    <div class="change-role" @click="changeRole()">
+                        <!-- <template v-if="isAdmin">
+                            <span class="desc">{{adminType == 1 ? '超级管理员' : adminType == 2 ? '区域管理员' : '合作联社社长'}}</span>
+                        </template>
+                        <template v-else>
+                            <template v-if="wokerJob">  
+                                <template v-if="wokerJob.length == 1">
+                                    <span class="desc">{{wokerJob[0].post_name}}</span>
+                                </template>
+                                <template v-else>
+                                    <img class="change-icon" src="../images/public/change-role-icon.png" alt="">
+                                    <span class="desc">切换身份</span>
+                                </template>
+                            </template>
+                        </template> -->
+                        <template v-if="wokerJob.length > 0">
+                            <template v-if="wokerJob.length == 1 && wokerJob[0].job.length == 1">
+                                <span class="desc">{{userInfo.post_name}}</span>
+                            </template>
+                            <template v-else>
+                                <img class="change-icon" src="../images/public/change-role-icon.png" alt="">
+                                <span class="desc">切换身份</span>
+                            </template>
+                        </template>
+                    </div>
+                </div>
+                <div class="routers">
+                    <el-scrollbar wrap-class="scrollbar-wrapper">
+                        <template v-if="!isChat" >
+                            <div class="router-item" v-for="(item,index) in routes" :key="index" @click.stop="clickMenuItem(1,item)">
+                                <div class="item-info" :class="{'select-border-color': item.active}" @mouseover.stop="mouseoverMenu($event,1,item,index)" @mouseout.stop="mouseoutMenu($event,1,item,index)">
+                                    <img class="item-icon" :src="item.active ? item.selectIcon : item.icon" alt="">
+                                    <span class="tit" :class="{'select-tit': item.active}">{{item.title}}</span>
+                                    <img class="arrow-icon" :class="{'select-arrow': item.active}" v-if="item.children && item.children.length > 0" :src="item.active ? arrowVIcon : arrowHIcon" alt="">
+                                </div>
+                                <el-collapse-transition>
+                                    <div v-if="item.active">
+                                        <div class="router-sub-item"  v-for="(subItem,subIndex) in item.children" :key="subIndex" @click.stop="clickMenuItem(2,subItem,index)">
+                                            <div class="subItem-info" @mouseover.stop="mouseoverMenu($event,2,subItem,subIndex,index)" @mouseout.stop="mouseoutMenu($event,2,subItem,subIndex,index)">
+                                                <img class="item-icon" :src="subItem.active ? subItem.selectIcon : subItem.icon" alt="">
+                                                <span class="tit" :class="{'select-tit': subItem.active}">{{subItem.title}}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </el-collapse-transition>
+                            </div>
+                        </template>
+                        <template v-else>
+                            <div style="height:20px"></div>
+                            <div class="chat-item" v-for="(item,index) in charArr" :key="index" @click.stop="clickChatItem(item)">
+                                <div class="item-info">
+                                    <img class="item-icon" :src="item.active ? item.selectIcon : item.icon" alt="">
+                                    <span class="tit" :class="{'select-tit': item.active}">{{item.title}}</span>
+                                    <div class="num" v-if="item.num && item.num > 0">{{item.num}}</div>
+                                </div>
+                            </div>
+                        </template>
+                    </el-scrollbar>
+                </div>
+            </div>
+        </div>
+     </div>
+</template>
+<script>
+import { Loading } from 'element-ui';
+export default {
+  name: "bottom",
+  props: [],
+  data() {
+    return {
+    //   routes: [{
+    //       title: '基础信息',
+    //       push: '/baseInfo',
+    //       icon: require("../images/public/base-info-icon.png"),
+    //       selectIcon: require("../images/public/base-info-select-icon.png"),
+    //       active: false,
+    //       children:[{
+    //         title: '社员建档',
+    //         push: '/addConfrere',
+    //         icon: require("../images/public/base-info-icon2.png"),
+    //         selectIcon: require("../images/public/base-info-select-icon1.png"),
+    //         active: false,
+    //       },{
+    //         title: '社员档案',
+    //         push: '/confrereList',
+    //         icon: require("../images/public/base-info-icon2.png"),
+    //         selectIcon: require("../images/public/base-info-select-icon1.png"),
+    //         active: false,
+    //       },{
+    //         title: '社员审批',
+    //         push: '/confrereApproveList',
+    //         icon: require("../images/public/base-info-icon2.png"),
+    //         selectIcon: require("../images/public/base-info-select-icon1.png"),
+    //         active: false,
+    //       },{
+    //         title: '员工管理',
+    //         push: '/staffManage',
+    //         icon: require("../images/public/base-info-icon2.png"),
+    //         selectIcon: require("../images/public/base-info-select-icon1.png"),
+    //         active: false,
+    //       }]},{
+    //       title: '互助金业务',
+    //       active: false,
+    //       push: '/index',
+    //       icon: require("../images/public/aid-br-icon.png"),
+    //       selectIcon: require("../images/public/aid-br-select-icon.png"),
+    //       children:[],
+    //   },{
+    //       title: '借款业务',
+    //       active: false,
+    //       push: '/loanStepList',
+    //       icon: require("../images/public/repayment-br-icon.png"),
+    //       selectIcon: require("../images/public/repayment-br-select-icon.png"),
+    //       children:[{
+    //         title: '借款审批',
+    //         push: '/loanStepList',
+    //         icon: require("../images/public/base-info-icon2.png"),
+    //         selectIcon: require("../images/public/base-info-select-icon1.png"),
+    //         active: false,
+    //       },{
+    //         title: '借款申请',
+    //         push: '/loanApply',
+    //         icon: require("../images/public/base-info-icon2.png"),
+    //         selectIcon: require("../images/public/base-info-select-icon1.png"),
+    //         active: false,
+    //       },{
+    //         title: '借款列表',
+    //         push: '/loanList',
+    //         icon: require("../images/public/base-info-icon2.png"),
+    //         selectIcon: require("../images/public/base-info-select-icon1.png"),
+    //         active: false,
+    //       },{
+    //         title: '回收列表',
+    //         push: '/loanWithdrawList',
+    //         icon: require("../images/public/base-info-icon2.png"),
+    //         selectIcon: require("../images/public/base-info-select-icon1.png"),
+    //         active: false,
+    //       },{
+    //         title: '借款收回',
+    //         push: '/loanWithdraw',
+    //         icon: require("../images/public/base-info-icon2.png"),
+    //         selectIcon: require("../images/public/base-info-select-icon1.png"),
+    //         active: false,
+    //       }],
+    //   },{
+    //       title: '系统设置',
+    //       active: false,
+    //       push: '/loanDateList',
+    //       icon: require("../images/public/setting-icon.png"),
+    //       selectIcon: require("../images/public/setting-select-icon.png"),
+    //       children:[{
+    //         title: '借款期限配置',
+    //         push: '/loanDateList',
+    //         icon: require("../images/public/base-info-icon2.png"),
+    //         selectIcon: require("../images/public/base-info-select-icon1.png"),
+    //         active: false,
+    //       },{
+    //         title: '借款产品配置',
+    //         push: '/loanProductList',
+    //         icon: require("../images/public/base-info-icon2.png"),
+    //         selectIcon: require("../images/public/base-info-select-icon1.png"),
+    //         active: false,
+    //       },{
+    //         title: '股金利率配置',
+    //         push: '/passbookTermList',
+    //         icon: require("../images/public/base-info-icon2.png"),
+    //         selectIcon: require("../images/public/base-info-select-icon1.png"),
+    //         active: false,
+    //       },{
+    //         title: '审批流程配置',
+    //         push: '/loanExamList',
+    //         icon: require("../images/public/base-info-icon2.png"),
+    //         selectIcon: require("../images/public/base-info-select-icon1.png"),
+    //         active: false,
+    //       },{
+    //         title: '部门配置',
+    //         push: '/postList',
+    //         icon: require("../images/public/base-info-icon2.png"),
+    //         selectIcon: require("../images/public/base-info-select-icon1.png"),
+    //         active: false,
+    //       },{
+    //         title: '权限列表',
+    //         push: '/permissionLit',
+    //         icon: require("../images/public/base-info-icon2.png"),
+    //         selectIcon: require("../images/public/base-info-select-icon1.png"),
+    //         active: false,
+    //       },{
+    //         title: '系统日志',
+    //         push: '/logList',
+    //         icon: require("../images/public/base-info-icon2.png"),
+    //         selectIcon: require("../images/public/base-info-select-icon1.png"),
+    //         active: false,
+    //       },{
+    //         title: '短信记录',
+    //         push: '/codelists',
+    //         icon: require("../images/public/base-info-icon2.png"),
+    //         selectIcon: require("../images/public/base-info-select-icon1.png"),
+    //         active: false,
+    //       }],
+    //   }],
+    //   navArr: [
+    //     {
+    //       name: "首页",
+    //       push: "/index",
+    //       icon: require("../images/public/home-icon.png"),
+    //       active: true,
+    //     },
+    //     {
+    //       name: "建档",
+    //       push: "/addConfrere",
+    //       icon: require("../images/public/file-icon.png"),
+    //       active: false,
+    //     },
+    //     {
+    //       name: "开户",
+    //       push: "/kaihu",
+    //       icon: require("../images/public/add-user.png"),
+    //       active: false,
+    //     },
+    //     {
+    //       name: "借款",
+    //       push: "/loanApply",
+    //       icon: require("../images/public/loan-icon.png"),
+    //       active: false,
+    //     },
+    //     {
+    //       name: "还款",
+    //       push: "/loanWithdraw",
+    //       icon: require("../images/public/repayment-icon.png"),
+    //       active: false,
+    //     },
+    //     {
+    //       name: "通告",
+    //       push: "/tonggao",
+    //       icon: require("../images/public/notice-icon.png"),
+    //       active: false,
+    //     }
+    //   ],
+      routes:[], // 左侧导航栏
+      navArr:[], // 顶部快捷栏
+      arrowHIcon: require('../images/public/arrow-h-icon.png'),
+      arrowVIcon: require('../images/public/arrow-v-icon.png'),
+
+      isChat: false, // 是否点击了对话
+      charArr: [{
+          title: '消息',
+          icon: require('../images/chat/nav-msg-icon.png'),
+          selectIcon: require('../images/chat/nav-msg-select-icon.png'),
+          active: false,
+          num: 0,
+          push: '/msgList'
+      },{
+          title: '联系人',
+          icon: require('../images/chat/nav-people-icon.png'),
+          selectIcon: require('../images/chat/nav-people-select-icon.png'),
+          active: false,
+          num: 0,
+          push: '/'
+      },{
+          title: '文件',
+          icon: require('../images/chat/nav-people-icon.png'),
+          selectIcon: require('../images/chat/nav-people-select-icon.png'),
+          active: false,
+          num: 0,
+          push: '/'
+      },{
+          title: '图片',
+          icon: require('../images/chat/nav-people-icon.png'),
+          selectIcon: require('../images/chat/nav-people-select-icon.png'),
+          active: false,
+          num: 0,
+          push: '/'
+      }], // 左侧消息栏
+
+      fullScreenLoading: '', //全局loading
+
+      isAdmin: false, // 是否为管理员
+      adminType: '', // 管理员类型
+      wokerJob: [], // 合作社与身份二维数组
+      userInfo:{}, //用户登陆信息
+      jobArr: [],
+    };
+  },
+  watch:{
+    $route(to,from){ // 监听路由变化 注: 目前只准备用来监听聊天相关
+      console.log(from.path);//从哪来
+      console.log(to.path);//到哪去
+    },
+    },
+    created() {
+         window.localStorage.setItem = function(k, v) { // 监听本地存储变量 把本地存储变量模拟为全局变量
+            if (k === 'chatMsgNum') {
+
+            }   
+        }
+    },
+  mounted() {
+    // 测试数据-模拟登陆存储权限router
+    // localStorage.setItem('routes',JSON.stringify(this.routes))
+    let adminType = localStorage.getItem('is_admin')
+    if(adminType && Number(adminType) >= 1) {
+        this.isAdmin = true
+        this.adminType = adminType
+    }
+    this.wokerJob = localStorage.getItem('worker_job') ?  JSON.parse(localStorage.getItem('worker_job')) : []
+    this.userInfo = localStorage.getItem('userInfo') ?  JSON.parse(localStorage.getItem('userInfo')) : {}
+    this.getRoutes() 
+   },
+  methods: {
+    // 点击logo返回首页
+    toIndex() {
+        
+        localStorage.setItem('os','8888')
+        return
+        if(this.$route.path == '/index') return
+        this.routes.forEach(routeItem =>{
+            routeItem.active = false
+        })
+        this.navArr[0].active = true
+        this.$router.push('/index')
+    },
+    // 账号管理 
+    accountManage() {
+        this.routes.forEach(routeItem =>{
+            routeItem.active = false
+        })
+        this.$router.push('/personal')
+    },
+    // 退出系统
+    logout() {
+        this.$confirm('此操作将退出系统, 是否继续?', '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(() => {
+            localStorage.clear()
+            this.$router.push('/login')
+        }).catch(() => {});
+    },
+    // 切换身份
+    changeRole() {
+        // let wokerJob = localStorage.getItem('worker_job') ?  JSON.parse(localStorage.getItem('worker_job')) : ''
+        if(this.wokerJob.length > 0) {
+            if(this.wokerJob.length == 1) {
+                if(this.wokerJob[0].job.length == 1) return
+            }
+            this.$router.push({
+                path: '/changeRole',
+                query: {
+                    source: 'navMenu'
+                }
+            })
+        } else {
+            this.$message.error('登陆已过期,请重新登陆')
+            this.$router.push('/login')
+        }        
+    },
+    // 鼠标经过menu路由事件 主要用于改变img的src
+    mouseoverMenu(e,level,item,index,partentIndex) {// level: 1-一级menu 2- 二级menu
+        // if(level == 1) {
+        //     document.querySelectorAll('.item-info')[index].children[0].src = item.selectIcon
+        // } else if(level == 2) {
+        //     document.querySelectorAll('.subItem-info')[index].children[0].src = item.selectIcon
+        // }
+    },
+   // 鼠标离开menu路由事件 主要用于还原img的src 
+    mouseoutMenu(e,level,item,index,partentIndex) { // level: 1-一级menu 2- 二级menu  
+        // if(level == 1) {
+        //     if(!item.active) {
+        //         document.querySelectorAll('.item-info')[index].children[0].src = item.icon
+        //     }
+        // } else if(level == 2) {
+        //     if(!item.active) {
+        //         document.querySelectorAll('.subItem-info')[index].children[0].src = item.icon
+        //     }
+        // }
+    },
+    // 置空menu的active状态
+    initRoutesActive() { 
+        let routes = this.routes
+        let navArr = this.navArr
+        routes.forEach(item =>{
+            if(!item.children || item.children.length == 0) {
+                item.active = false
+            }
+            if(item.children && item.children.length > 0) {
+                item.children.forEach(subItem =>{
+                    subItem.active = false
+                })
+            }
+        })
+        navArr.forEach(item =>{
+            item.active = false
+        })
+    },
+    // 获取当前权限所有路由
+    getRoutes() { 
+        let that = this;
+        let data = localStorage.getItem('routes') ? that.utils.handleRoutesData(JSON.parse(localStorage.getItem('routes'))) : '';
+        if(data) {
+            that.routes = data[0]
+            that.navArr = data[1]
+        }else {
+            that.fullScreenLoading = that.$loading({ text: '正在重新获取权限...', background:'rgba(0, 0, 0, 0.7)' });
+            that.requestRoutes()  
+        }
+    },
+    // 请求当前权限所有路由接口
+    requestRoutes() {
+        let that = this;
+        let userInfo = JSON.parse( localStorage.getItem('userInfo'))
+        if(userInfo && userInfo.post_id) {
+             that.ajax('get_privilege',{
+                post_id:userInfo.post_id
+            },'获取权限列表失败',res =>{
+                that.fullScreenLoading.close()  
+                if(res.errno == 0) {
+                    that.routes = res.data
+                    localStorage.setItem('routes',JSON.stringify(that.routes))
+                    that.routes = that.utils.handleRoutesData(res.data)[0]
+                    that.navArr = that.utils.handleRoutesData(res.data)[1]
+                    that.$router.push('/index')
+                } else {
+                    that.$message.error(res.data.errmsg ? res.data.errmsg : '获取权限接口服务异常,请刷新重试');
+                }
+            }, err =>{
+                that.fullScreenLoading.close()  
+            })
+        } else {
+            this.$message.error('请先登录')
+             that.fullScreenLoading.close()
+            this.$router.push('/login')
+        }
+       
+    },
+    // 点击对话
+    toChat() {
+        if(this.$route.path == 'msgList') return
+        this.initRoutesActive()
+        this.routes.forEach(routeItem =>{
+            routeItem.active = false
+        })
+        this.isChat = true
+        this.charArr.forEach(item =>{
+            item.active = false
+        })
+        this.charArr[0].active = true
+        this.$router.push({ path: '/msgList' })
+    },
+    // 点击左侧导航栏
+    clickChatItem(item) {
+        if(this.$route.path == item.push) return // 点击已打开页面不跳转
+        this.charArr.forEach(item =>{
+            item.active = false
+        })
+        this.$set(item,'active',true)
+        this.$router.push({ path: item.push })
+    },
+    // 点击上侧导航栏
+    clickTopNavItem(item) {
+        this.isChat = false
+        if(this.$route.path == item.push) return
+        this.initRoutesActive()
+        if(item.push == '/index') {
+            this.routes.forEach(routeItem =>{
+                routeItem.active = false
+            })
+            item.active = true
+            this.$router.push({ path: item.push })
+            return
+        }
+        let routes = JSON.parse(JSON.stringify(this.routes))
+        let isHasRoute = false
+        routes.forEach(routeItem =>{
+            if(routeItem.children && routeItem.children.length > 0) {
+                routeItem.children.forEach(routeChildItem =>{
+                    if(routeChildItem.push == item.push) {
+                        routeItem.active = true
+                        routeChildItem.active = true
+                        isHasRoute = true
+                    }
+                })
+            } else {
+                if(item.push == routeItem.push) {
+                    routeItem.active = true
+                    isHasRoute = true
+                }
+            }
+        })
+        item.active = true
+        this.$router.push({
+             path: isHasRoute ? item.push : '/noPermission',
+             query: {
+                 pathName: item.name
+             }
+        })
+        this.routes = routes
+    },
+    //点击左侧跳转路由
+    clickMenuItem(type,item,parentIndex){ //type: 1-一级menu 2-二级menu  item:当前router配置
+        let that = this;
+        let navArr = this.navArr
+        if(type == 1) {
+            if(item.children.length > 0) {
+                setTimeout(() =>{
+                    item.active = !item.active
+                },100)
+            } else {
+                if(that.$route.path == item.push) return // 点击已打开页面不跳转
+                that.initRoutesActive()
+                that.$set(item,'active',!item.active)
+                that.$router.push({ path: item.push })
+            }
+        }else if(type == 2) {
+            if(that.$route.path == item.push) return // 点击已打开页面不跳转
+            that.initRoutesActive()
+            that.$set(item,'active',!item.active)
+            that.$router.push({ path: item.push })
+        }
+        navArr.forEach(navItem =>{
+            if(item.push == navItem.push) {
+                navItem.active = true
+            } 
+        })
+    },
+  }
+};
+</script>
+<style lang="less">
+.nav-menu {
+    .top-con {
+        display: flex;
+        align-items: center;
+        flex-direction: column;
+        background:url('../images/public/nav-bg.png');
+        background-size: 100% 100%;
+        height: 14rem;
+        .top-nav {
+            width: 100%;
+            height: 7rem;
+            padding: 0 5rem;
+            display: flex;
+            align-items: center; 
+            .logo-con {
+                cursor: pointer;
+                .logo-text {
+                    color: #fff;
+                    font-size: 2rem;
+                    font-weight: bold;
+                    border-bottom: 0.06rem solid #EBF0FE;
+                    padding-bottom: 0.2rem;
+                }
+                .desc {
+                    font-size: 1.33rem;
+                    color: #ACC2FF;
+                }
+            }
+            .nav-con {
+                display: flex;
+                align-items: center;
+                padding-left: 8rem;
+                .nav-item {
+                    display: flex;
+                    align-items: center;
+                    flex-direction: column;
+                    padding: 0 3rem;
+                    color: #B8D4FF;
+                    img {
+                        width: 2rem;
+                        height: 2rem;
+                    }
+                    span {
+                        font-size: 1rem;
+                        padding-top: 0.2rem;
+                        position: relative;
+                    }
+                }
+                .nav-item:hover {
+                    cursor: pointer;
+                    color: #fff;
+                    span:after {
+                        content: '';
+                        height: 4px;
+                        width: 60%;
+                        background: #fff;
+                        position: absolute;
+                        bottom: -6px;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        border-radius: 100px;
+                    }
+                }
+                .nav-active-item {
+                    cursor: pointer;
+                    color: #fff;
+                    span:after {
+                        content: '';
+                        height: 4px;
+                        width: 60%;
+                        background: #fff;
+                        position: absolute;
+                        bottom: -6px;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        border-radius: 100px;
+                    }
+                }
+
+            }
+            .manage-con {
+                flex: 1;
+                display: flex;
+                align-items: center;
+                justify-content: flex-end;
+                .manage-item {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1rem;
+                    padding: 0.5rem;
+                    border: 1px solid #7FABEE;
+                    color: #B8D4FF;
+                    margin-left: 1.5rem;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    img {
+                        width: 1rem;
+                        height: 1rem;
+                        margin-right: 0.5rem;
+                    }
+
+                }
+                .manage-item:nth-child(2){
+                    background: rgba(255, 255, 255, 0.2);
+                    border-color: #f9f9f9;
+                    color: #f9f9f9;
+                }
+            }
+        }
+        .placeholder {
+            width: 100%;
+            height: 7rem;
+        }
+    }
+    .left-routes-con {
+        padding-left: 5rem;
+        height: calc(100vh - 12rem);
+        margin-top: -7rem;
+        background: transparent;
+        .routes-con {
+            width: 13rem;
+            background: #F0F8FF;
+            border-radius: 6rem 0 0 0;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            flex-direction: column;
+            padding-top: 3rem;
+            .user-info {
+                display: flex;
+                align-items: center;
+                flex-direction: column;
+                .header {
+                    width: 5rem;
+                    height: 5rem;
+                }
+                .change-role {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 0.2rem 0.4rem;
+                    border: 1px solid #3B6AF1;
+                    background: #E3F2FF;
+                    border-radius: 4px;
+                    margin-top: 0.5rem;
+                    margin-bottom: 0.8rem;
+                    cursor: pointer;
+                    .change-icon {
+                        width: 0.8rem;
+                        height: 0.8rem;
+                    }
+                    .desc {
+                        color: #3B6AF1;
+                        font-size: 0.75rem;
+                        padding-left: 0.2rem;
+                    }
+                }
+            }
+            .routers {
+                width: 100%;
+                padding-left: 2rem;
+                height: calc(100% - 9.5rem);
+                overflow: hidden;
+                .router-item {
+                    width: 100%;
+                    cursor: pointer;
+                    .item-info {
+                        display: flex;
+                        align-items: center;
+                        border-bottom: 2px solid #D0DDEB;
+                        margin-right: 2rem;
+                        margin-bottom: 0.5rem;
+                        margin-top: 0.5rem;
+                        padding-bottom: 0.2rem;
+                        cursor: pointer;
+                        .tit {
+                            color: #8F9BA7;
+                            font-size: 0.9rem;
+                            padding: 0.2rem;
+                            flex: 1;
+                        }
+                        .select-tit {
+                             color: #444444;
+                        }
+                        .item-icon {
+                            width: 1rem;
+                            height: 1rem;
+                            margin-right: 0.2rem;
+                        }
+                        .arrow-icon {
+                            width: 1rem;
+                        }
+                        .select-arrow {
+                           width: 0.6rem 
+                        }
+                        
+                    }
+                    .select-border-color {
+                        border-color: #3B6AF1;
+                    }
+                    .item-info:hover {
+                        border-color: #3B6AF1;
+                        .tit {
+                            color: #444444;
+                        }
+                    }
+                    .router-sub-item {
+                        padding-top: 0.5rem;
+                        cursor: pointer;
+                        .subItem-info {
+                            display: flex;
+                            align-items: center;
+                            cursor: pointer;
+                            .tit {
+                                color: #444;
+                                font-size: 0.9rem;
+                                padding: 0.2rem;
+                                flex: 1;
+                            }
+                            .select-tit {
+                                color: #3B6AF1;
+                            }
+                            .item-icon {
+                                width: 0.9rem;
+                                height: 0.9rem;
+                                margin-right: 0.2rem;
+                            }
+                        }
+                        .subItem-info:hover {
+                            .tit {
+                                color: #3B6AF1;
+                            }
+                        }
+                    }
+                   
+                }
+                .chat-item {
+                     width: 100%;
+                    cursor: pointer;
+                    .item-info {
+                        position: relative;
+                        display: flex;
+                        align-items: center;
+                        margin-right: 2rem;
+                        margin-bottom: 0.5rem;
+                        margin-top: 0.5rem;
+                        padding-bottom: 0.5rem;
+                        cursor: pointer;
+                        .tit {
+                            color: #8F9BA7;
+                            font-size: 0.9rem;
+                            padding: 0.2rem;
+                            flex: 1;
+                        }
+                        .select-tit {
+                             color: #444444;
+                        }
+                        .item-icon {
+                            width: 1.2rem;
+                            height: 1.2rem;
+                            margin-right: 0.2rem;
+                        }
+                        .arrow-icon {
+                            width: 1rem;
+                        }
+                        .select-arrow {
+                           width: 0.6rem 
+                        }
+                        .num {
+                            position: absolute;
+                            top: 50%;
+                            right: 0;
+                            background: #F61060;
+                            border-radius: 1000px;
+                            color: #fff;
+                            font-size: 10px;
+                            padding: 2px 4px;
+                            transform: translateY(-50%);
+                        }
+                        
+                    }
+                    .select-border-color {
+                        border-color: #3B6AF1;
+                    }
+                    .item-info:hover {
+                        .tit {
+                            color: #444444;
+                        }
+                    }
+                }
+
+            }
+        }
+    }
+    
+}
+</style>

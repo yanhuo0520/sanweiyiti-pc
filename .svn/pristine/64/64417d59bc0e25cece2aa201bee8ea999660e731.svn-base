@@ -1,0 +1,332 @@
+<template>
+  <div id="app">
+    <!-- <router-view v-if="isRouterAlive"></router-view> -->
+    <keep-alive>
+   <router-view v-if="$route.meta.keepAlive"></router-view>
+ </keep-alive>
+ <router-view v-if="!$route.meta.keepAlive"></router-view>
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'App',
+  provide() {
+    //父组件中通过provide来提供变量，在子组件中通过inject来注入变量。
+    return {
+      reload: this.reload
+    };
+  },
+  data() {
+    return {
+      isRouterAlive: true //控制视图是否显示的变量
+    };
+  },
+  methods: {
+    reload() {
+      this.isRouterAlive = false; //先关闭，
+      this.$nextTick(function() {
+        this.isRouterAlive = true; //再打开
+      });
+    }
+  }
+}
+</script>
+
+<style>
+html,body{
+  height: 100%;
+  font-size: 16px;
+  margin: 0;
+  padding: 0;
+}
+#app {
+  font-family: 'Avenir', Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  height: 100%;
+  background: #DFEFFD;
+  min-width: 1400px;
+  overflow-x: auto;
+}
+h1,h2,h3,h4,h5,h6,p{
+  margin: 0
+}
+dl{
+  margin-top: 0;
+  margin-bottom: 0;
+}
+dd{
+  margin-left: 0;
+}
+ul{
+  margin-left: 0;
+
+}
+input,button{
+  border: none;
+}
+.content{ position:absolute;top: 7rem;right:5rem;bottom:5rem;left:18rem;width: auto; background-color: white; border-radius: 0 0  6rem 0;}
+.el-scrollbar { height: 100%; }
+.scrollbar-wrapper {  overflow-x: hidden !important; height: 100%; margin-bottom: 0!important; }
+.el-scrollbar__view { height: 100%;}
+.el-scrollbar__bar { z-index: 99 }
+.clearfix:after{
+    content:"";/*设置内容为空*/
+    height:0;/*高度为0*/
+    line-height:0;/*行高为0*/
+    display:block;/*将文本转为块级元素*/
+    visibility:hidden;/*将元素隐藏*/
+    clear:both;/*清除浮动*/
+}
+.clearfix{
+    zoom:1;/*为了兼容IE*/
+}
+
+.table-con { position: relative; width: 100%; min-height: 30rem; }
+.no-data-con { position: absolute; top: 0; left: 0; width: 100%; height: 20rem; }
+.no-data-con .absolute-center { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); }
+.no-data-con .absolute-center .err-info-text { font-size: 0.9rem; color: #999999; }
+.breadcrumb-con { display: flex; align-items: center; width: calc(100% + 20px); margin-left: -20px; margin-bottom: 20px; padding: 6px 20px; background-color: #F0F8FF }
+.breadcrumb-con .left-icon { width: 20px; height: 20px; margin-right: 0.5rem; }
+.breadcrumb-con .breadcrumb-info {flex: 1; display: flex; align-items: center;  }
+.el-breadcrumb { direction: flex; align-items: center; font-size: 0.875rem; padding: 0.5rem 0; color: #8F9BA7 }
+.el-breadcrumb  .breadcrumb-tit .el-breadcrumb__inner { color: #333; font-weight: bold }
+.el-breadcrumb  .breadcrumb-tit .el-breadcrumb__inner:hover { color: #333; font-weight: bold }
+.breadcrumb-con .back-con { display: flex; align-items: center; cursor: pointer; }
+.breadcrumb-con .back-con .back-icon { width: 20px; height: 20px; }
+.breadcrumb-con .back-con .back-text { color: #444; font-size: 0.875rem; margin-left: 10px; }
+.breadcrumb-con+.operate-con { padding-top: 0!important }
+.el-image-viewer__wrapper .el-image-viewer__btn .el-icon-circle-close { color: #fff }
+/* 读取ic卡iframe弹窗 */
+.iframe-absolute-con { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); }
+.iframe-absolute-con .ic-iframe { position: absolute; top: 50%; left: 50%; width: 500px; height: 200px; transform: translate(-50%,-70%); background: #fff; z-index: 999; box-shadow: 0 0 10px #ccc; border-radius: 8px; }
+
+.admin-tag-num { position: absolute; top: 0.3rem; left: 0.4rem; border-radius: 1000px; background: rgba(250, 7, 7, 0.801); min-width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; padding: 0 5px; color: #fff; }
+
+.imgStyle {
+	height: 50px;
+	width: 50px;
+	border-radius: 50%;
+}
+.imgStyle1 {
+	height: 25px;
+	width: 25px;
+	border-radius: 50%;
+}
+.imgStyle2 {
+	height: 35px;
+	width: 35px;
+	border-radius: 50%;
+}
+.imgStyle3 {
+	height: 45px;
+	width: 45px;
+	border-radius: 50%;
+}
+.imgStyle4 {
+	height: 65px;
+	width: 65px;
+	border-radius: 50%;
+}
+.imgStyle5 {
+	height: 75px;
+	width: 75px;
+	border-radius: 50%;
+}
+.imgStyle6 {
+	height: 85px;
+	width: 85px;
+	border-radius: 50%;
+}
+.imgStyle7 {
+	height: 100px;
+	width: 100px;
+	border-radius: 50%;
+}
+.imgStyle8 {
+	height: 50px;
+	width: 50px;
+}
+.imgStyle9 {
+	height: 25px;
+	width: 25px;
+}
+.imgStyle10 {
+	height: 35px;
+	width: 35px;
+}
+.imgStyle11 {
+	height: 45px;
+	width: 45px;
+}
+.imgStyle12 {
+	height: 65px;
+	width: 65px;
+}
+.imgStyle13 {
+	height: 75px;
+	width: 75px;
+}
+.imgStyle14 {
+	height: 85px;
+	width: 85px;
+}
+.imgStyle15 {
+	height: 100px;
+	width: 100px;
+}
+
+.row-start-start {
+	display: flex;
+	display: -webkit-flex;
+	flex-direction: row;
+	justify-content: flex-start;
+	align-items: flex-start;
+}
+.row-center {
+	display: flex;
+	display: -webkit-flex;
+	flex-direction: row;
+	justify-content: center;
+	align-items: center;
+}
+.row-center-start {
+	display: flex;
+	display: -webkit-flex;
+	flex-direction: row;
+	justify-content: center;
+	align-items: flex-start;
+}
+.row-space-around {
+	display: flex;
+	display: -webkit-flex;
+	flex-direction: row;
+	justify-content: space-around;
+	align-items: center;
+}
+.row-flex-start {
+	display: flex;
+	display: -webkit-flex;
+	flex-direction: row;
+	justify-content: flex-start;
+	align-items: center;
+}
+ 
+.row-start-wrap {
+	display: flex;
+	display: -webkit-flex;
+	flex-direction: row;
+	justify-content: flex-start;
+	align-items: center;
+	flex-wrap: wrap;
+}
+.row-start-start-wrap {
+	display: flex;
+	display: -webkit-flex;
+	flex-direction: row;
+	justify-content: flex-start;
+	align-items: start;
+	flex-wrap: wrap;
+}
+.row-flex-end {
+	display: flex;
+	display: -webkit-flex;
+	flex-direction: row;
+	justify-content: flex-end;
+	align-items: center;
+}
+.row-start-end {
+	display: flex;
+	display: -webkit-flex;
+	flex-direction: row;
+	justify-content: flex-start;
+	align-items: flex-end;
+}
+.row-space-between {
+	display: flex;
+	display: -webkit-flex;
+	flex-direction: row;
+	justify-content: space-between;
+	align-items: center;
+}
+.column-center {
+	display: flex;
+	display: -webkit-flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+}
+.column-start-start {
+	display: flex;
+	display: -webkit-flex;
+	flex-direction: column;
+	justify-content: flex-start;
+	align-items: flex-start;
+}
+.column-start-center {
+	display: flex;
+	display: -webkit-flex;
+	flex-direction: column;
+	justify-content: flex-start;
+	align-items: center;
+}
+.column-center-start {
+	display: flex;
+	display: -webkit-flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: flex-start;
+}
+
+.column-end {
+	display: flex;
+	display: -webkit-flex;
+	flex-direction: column;
+	justify-content: flex-end;
+	align-items: center;
+}
+.column-end-start {
+	display: flex;
+	display: -webkit-flex;
+	flex-direction: column;
+	justify-content: flex-end;
+	align-items: flex-start;
+}
+.column-space-around {
+	display: flex;
+	display: -webkit-flex;
+	flex-direction: column;
+	justify-content: space-around;
+	align-items: center;
+}
+.column-space-start {
+	display: flex;
+	display: -webkit-flex;
+	flex-direction: column;
+	justify-content: space-around;
+	align-items: flex-start;
+}
+.column-space-between {
+	display: flex;
+	display: -webkit-flex;
+	flex-direction: column;
+	justify-content: space-between;
+	align-content: space-between;
+}
+.column-space-center {
+	display: flex;
+	display: -webkit-flex;
+	flex-direction: column;
+	justify-content: space-between;
+	align-content: center;
+}
+.column-center-end {
+	display: flex;
+	display: -webkit-flex;
+	flex-direction: column;
+	align-content: end;
+	align-items: flex-end;
+}
+</style>
+

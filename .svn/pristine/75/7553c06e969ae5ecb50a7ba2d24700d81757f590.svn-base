@@ -1,0 +1,427 @@
+<template>
+    <div class="admin-list"  v-loading="loading">
+		<div class="breadcrumb-con">
+			<img class="left-icon" src="../../images/breadcrumb-left-icon.png" alt="">
+			<div class="breadcrumb-info">
+				<el-breadcrumb separator-class="el-icon-arrow-right">
+					<el-breadcrumb-item>系统配置</el-breadcrumb-item>
+					<el-breadcrumb-item  class="breadcrumb-tit">管理员列表</el-breadcrumb-item>
+				</el-breadcrumb>
+			</div>
+			<el-button size="small" @click="initData()">刷新</el-button>
+		</div>
+		<div class="operate-con clearfix">
+            <div class="operate-con clearfix">
+                <div class="search-con">
+                </div>
+                <div class="btn-con" v-if="isAdd">
+                    <el-button size="small" type="primary" @click="toCheckTel(1,null)">添加</el-button>
+                </div>
+            </div>
+        </div>
+        <div class="table-con">
+            <template v-if="data && data.length > 0">
+                <el-table :data="data" border >
+                    <el-table-column prop="nick_name" label="昵称" align="center"></el-table-column>
+                    <el-table-column prop="uname" label="账号" align="center"></el-table-column>
+                    <el-table-column prop="addressName" label="归属地" align="center"></el-table-column>
+                    <el-table-column prop="add_time" label="添加时间" align="center"></el-table-column>
+                    <el-table-column label="操作" align="center" width="100" v-if="isEdit">
+                        <template slot-scope="scope">
+                            <el-button size="small" plain type="primary" @click="addEditData(2,scope.row)">编辑</el-button>
+                        </template>
+                    </el-table-column>
+                </el-table>
+            </template>
+            <template v-if="!data || data.length == 0">
+                <div class="no-data-con" >
+                    <div class="absolute-center">
+                        <div class="err-info-text ">暂无区域管理员列表</div>
+                    </div>
+                </div>
+            </template>
+            <el-pagination @current-change="handleCurPageChange" v-if="totalPage && totalPage > 0" background :current-page="curPage" layout="prev, pager, next" :total="totalPage*10"> </el-pagination>
+        </div>
+
+        <el-dialog :title="(formType == 1 ? '添加' : '编辑') + '区域管理员'" :visible.sync="adminFormDialog" >
+			<el-form  ref="adminForm"  :model="adminForm" :rules="rules" label-width="100px" >
+				<el-form-item label="登录账号:" prop="uname">
+					<el-input v-model="adminForm.uname" placeholder="请输入区域管理员账号" readonly></el-input>
+				</el-form-item>
+                <el-form-item label="账号昵称:" prop="nick_name">
+					<el-input v-model="adminForm.nick_name" placeholder="请输入区域管理员昵称"></el-input>
+				</el-form-item>
+                <el-form-item label="归属地:" prop="address">
+					<el-cascader ref="address" v-model="addressActive" :options="addressOptions" :placeholder="formType == 1 ? '请选择归属地' : adminForm.address" :props="{ label: 'name', value: 'code' }" @change="selectAddress" @expand-change="expandAddress"></el-cascader>
+                </el-form-item>
+                <el-form-item label="密码:" prop="password" :rules="formType == 1 ? pwdRule : {}">
+					<el-input type="password" v-model="adminForm.password" :placeholder="formType == 1 ? '请输入区域管理员密码' : '为空不修改密码'"></el-input>
+				</el-form-item>
+			</el-form>
+			<div slot="footer" class="dialog-footer">
+				<el-button @click="adminFormDialog = false">取 消</el-button>
+				<el-button type="primary" @click="submitForm('adminForm')" :loading="submitLoading">确 定</el-button>
+			</div>
+		</el-dialog>
+    </div>
+</template>
+<script>
+export default {
+  name: "adminList",
+  data() {
+    return {
+      data: [],
+	  curPage: 1,
+      totalPage: null,
+      
+      adminForm: {
+          uname: '',
+          nick_name: '',
+          password: '',
+          provinceCode: '',
+          cityCode: '',
+          areaCode: '',
+          address: '',
+      },
+      rules: {
+        uname: [
+            { required: true, message: '请输入登录账号', trigger: 'blur' }
+        ],
+        address: [
+            { required: true, message: '请选择归属地', trigger: 'change' }
+        ],
+      },
+      pwdRule: [
+            { required: true, message: '请输入登录密码', trigger: 'blur' }
+        ],
+      adminFormDialog: false,
+      addressOptions: [],
+      addressActive:  [],
+      formType: 1, //1-添加 2-编辑
+
+      loading: false,
+      submitLoading:  false,
+
+      isEdit: false, // 是否有编辑权限
+      isAdd: false, // 是否有添加权限
+
+      checkData: null, // 手机号检查数据
+    };
+  },
+  activated() {
+      this.initData()
+      this.handlePermission()
+      this.getAddress(1,'')
+  },	
+  methods: {
+	// 初始化信息
+	initData() {
+      this.data = []
+	  this.curPage = 1
+      this.totalPage = null
+	  this.getAdminList()
+    },
+    // 判断当前页面都有什么权限
+	handlePermission() { 
+		let that = this;
+		that.utils.getPermissionList(that,data =>{
+			data.forEach(item =>{
+				if(item.title == '编辑') {
+					that.isEdit = true
+                }
+                if(item.title == '添加') {
+					that.isAdd = true
+				}
+			})
+		})
+    },
+    // 检验手机号是否注册过
+    toCheckTel(type,row) { // //1-添加 2-修改
+        let that = this;
+        that.$prompt('请先验证您的手机号', '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          inputPattern: /^1[3456789]\d{9}$/,
+          inputErrorMessage: '请输入正确的手机号',
+          type:'warning',
+          center: true
+        }).then(({ value }) => {
+            that.ajax('checkTel',{
+                phone: value,
+                type: 3
+            },'',res =>{
+            if(res.errno == 0) {   
+                that.checkData = res.data
+                that.$message.success('手机号还未注册,请填写注册信息')
+                that.addEditData(type,row,value)
+            } else if(res.errno == 2) {
+                that.$message.error('该手机已注册')
+            } else if(res.errno == 3) { // 无员工与社员注册信息
+                that.$message.success('手机号还未注册,请填写注册信息')
+                that.checkData = null
+                that.addEditData(type,row,value)
+            } else {
+                that.$message.error('手机号验证失败')
+            }
+            })
+        }).catch(() => {});
+         
+    },
+    // 添加/编辑数据
+    addEditData(type,row,checkTel) { //1-添加 2-修改
+        if(type == 1) {
+            if(this.checkData) {
+                this.adminForm = {
+                    uname: checkTel,
+                    nick_name: this.checkData.name,
+                    password: '',
+                    provinceCode: '',
+                    cityCode: '',
+                    areaCode: '',
+                    address: '',
+                }
+            }else {
+                this.adminForm = {
+                    uname: checkTel,
+                    nick_name: '',
+                    password: '',
+                    provinceCode: '',
+                    cityCode: '',
+                    areaCode: '',
+                    address: '',
+                }
+            }
+        } else {
+            this.adminForm = {
+                uname: row.uname,
+                nick_name: row.nick_name,
+                password: '',
+                provinceCode: row.provinceCode,
+                cityCode: row.cityCode,
+                areaCode: row.areaCode,
+                address: row.addressName,
+                job_id: row.job_id,
+                addressActive: [],
+            }
+        }
+        this.addressActive = []
+        this.formType = type
+        this.adminFormDialog  = true
+        // this.$refs['address'].clearCheckedNodes()
+        
+    },
+    // 提交form表单
+    submitForm(formName) {
+        let that = this;
+        let type = that.formType //1-添加 2-修改
+        that.adminForm.password = that.adminForm.password.trim()
+		that.$refs[formName].validate((valid) => {
+          if (valid) {
+              that.submitLoading = true
+              let params = JSON.parse(JSON.stringify(that.adminForm))
+              if(that.adminForm.password) {
+                params.password = that.utils.recursiveMD5(that.adminForm.password, 1)
+              }
+              that.ajax((type == 1 ? 'districtAdd' : 'districtMod'),params,(type == 1 ? '添加' : '编辑')+ '失败',res =>{
+                that.submitLoading = false
+                if(res.errno == 0) {
+					that.$message.success((type == 1 ? '添加' : '编辑')+'成功')
+					that.getAdminList(true)
+					that.resetForm(formName)
+					that.adminFormDialog = false
+                }
+              }, err =>{
+                   that.submitLoading = false
+              })
+          } else {
+            setTimeout(()=>{
+                let isError= document.getElementsByClassName("is-error");
+                let firstErrInput = isError[0].querySelector('input')
+				firstErrInput.focus();
+            },100);
+            return false;
+          }
+        });
+    },
+	// 获取管理员列表
+	getAdminList(isAddEdit) {
+		let that = this
+        if(isAddEdit) {
+            that.loading = false;
+        } else {
+            that.loading = true;
+        }
+		that.ajax('adminLists',{
+            page: that.curPage,
+			size: 10,
+        },'获取区域管理员列表失败',res =>{
+			that.loading = false
+			if(res.errno == 0) {
+                that.curPage = Number(res.data.current_page)
+				that.totalPage = res.data.total
+				that.data = res.data.data
+			}
+		}, err =>{
+			that.loading = false
+		})
+    },
+    // 获取省市区
+    getAddress(level,code) {
+        let that = this
+        // that.loading = true;
+		that.ajax('cooperative',{
+            level: level,
+			code: code,
+        },'获取地址失败',res =>{
+            // that.loading = false
+            if(level < 3) {
+                res.data.forEach(item =>{
+                    item.children = []
+                })
+            }
+			if(res.errno == 0) {
+                if(level == 1) {
+				    that.addressOptions = res.data
+                } else if(level == 2){
+                    that.addressOptions[that.oneIndex].children = res.data
+                } else if(level == 3){
+                    that.addressOptions[that.oneIndex].children[that.twoIndex].children = res.data
+                }
+			}
+		}, err =>{
+			// that.loading = false
+		})
+    },
+    // 展开地址
+    expandAddress(arr) {
+        if(arr.length == 1) {
+            for(let i = 0; i < this.addressOptions.length; i++) {
+                if(this.addressOptions[i].code == arr[0]) {
+                    this.oneIndex = i
+                    this.oneText = this.addressOptions[i].name
+                    this.addressOptions[i].children = []
+                    break;
+                }
+            }
+        } else if(arr.length == 2) {
+            let twoArr = this.addressOptions[this.oneIndex].children
+           for(let i = 0; i < twoArr.length; i++) {
+                if(twoArr[i].code == arr[1]) {
+                    this.twoIndex = i
+                    this.twoText = twoArr[i].name
+                    twoArr[i].children = []
+                    break;
+                }
+            }
+        }
+        this.getAddress(arr.length+1,arr[arr.length - 1])
+    },
+    // 选择省市区
+    selectAddress(val) {
+        if(val.length == 1) {
+            this.adminForm.provinceCode = val[0]
+        } else if(val.length == 2) {
+            this.adminForm.cityCode = val[1]
+        } else if(val.length == 3) {
+            let tmpArr = this.addressOptions[this.oneIndex].children[this.twoIndex].children
+            let tmpText = ''
+            for(let i = 0; i < tmpArr.length; i++) {
+                if(tmpArr[i].code == val[2]) {
+                    tmpText = tmpArr[i].name
+                    break;
+                }
+            }
+            this.adminForm.provinceCode = val[0]
+            this.adminForm.cityCode = val[1]
+            this.adminForm.areaCode = val[2]
+            this.adminForm.address = this.oneText + this.twoText + tmpText 
+        }
+    },
+    // 处理分页
+	handleCurPageChange(val) {
+		this.curPage = val;
+		this.getAdminList()
+    },
+    // 重置form表单
+    resetForm(formName) {
+        this.$refs[formName].resetFields();
+    }
+  }
+};
+</script>
+<style lang="less">
+.admin-list {
+  padding: 20px;
+  .el-pagination{
+        float: right;
+        margin-top: 30px;
+        margin-bottom: 30px;
+	}
+	.operate-con {
+	  padding: 10px 0;
+    .search-con {
+	  float: left;
+	  width: 80%;
+	  .el-form-item {
+		width: 28%;
+		float: left;
+		margin-bottom: 0;
+		.el-form-item__label {
+			font-size: 0.9rem;
+		}
+		.el-form-item__content {
+			margin-right: 30px;
+			.el-input {
+			width: 100%;
+			.read-idCard {
+				color: #3B6AF1;
+				background: #F0F8FF;
+				font-size: 0.75rem;
+				cursor: pointer;
+			}
+		}
+		}
+		
+	}
+    }
+    .btn-con {
+      float:right;
+    }
+  }
+    .table-con {
+		.inner-table-tit-con {
+			display: flex;
+			align-content: center;
+			justify-content: space-between;
+			.inner-table-tit {
+				flex: 1;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-weight: bold;
+				font-size: 1.2rem;
+				padding-bottom: 1.25rem;
+				text-align: center;
+				.btn-con {
+					display: flex;
+					align-items: center;
+					justify-content: center;
+				}
+			}
+		}	
+    }
+    .el-dialog {
+        width: 30%;
+		.el-form {
+			padding: 0 1rem;
+			.el-form-item__content {
+				.el-input {
+					width: 100%;
+				}
+			}
+        }
+       
+	}
+}
+
+</style>

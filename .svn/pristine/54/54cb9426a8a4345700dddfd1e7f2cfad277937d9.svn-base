@@ -1,0 +1,678 @@
+<template>
+    <div class="point-setting"  :class="{'admin-tmp-con': isAdmin}" v-loading="loading">
+        <template v-if="isAdmin">
+        <div class="breadcrumb-con">
+            <img class="left-icon" src="../../images/breadcrumb-left-icon.png" alt="">
+            <div class="breadcrumb-info">
+                <el-breadcrumb separator-class="el-icon-arrow-right">
+                    <el-breadcrumb-item>{{adminType == 1 ? '供应商城' : '合作商城'}}</el-breadcrumb-item>
+                    <el-breadcrumb-item  class="breadcrumb-tit">积分配置</el-breadcrumb-item>
+                </el-breadcrumb>
+            </div>
+          <el-button size="small" @click="initData()">刷新</el-button>
+        </div>
+        <div class="admin-con" v-loading="adminLoading">
+          <div class="org-menu-con">
+            <el-scrollbar wrap-class="scrollbar-wrapper">
+                <el-menu v-if="cooperativeList && cooperativeList.length > 0" class="el-menu-vertical-demo" :default-openeds="activeMenuArr" :default-active="activeMenu" @open="handleOpen" :unique-opened="true" background-color="#F8FCFF">
+                  <div v-for="(item,index) in cooperativeList" :key="index">
+                    <template v-if="item.count > 0">
+                      <el-submenu :index="index+''" :show-timeout="1000">
+                          <template slot="title">
+                            <el-tooltip class="item" :ref="'menu'+item.coopera_id" :disabled="item.disabled" @mouseenter.native="tipMouseenter(item)"  :content="item.coopera_name" placement="right-start">
+                              <div class="menu-title">{{item.coopera_name}}</div>
+                            </el-tooltip>
+                          </template>
+                          <el-menu-item v-for="(subItem,subIndex) in item.children" :index="(index+'-'+subIndex)" @click="clickMenuItem(subItem)" :key="subIndex">
+                            <template slot="title">
+                              <el-tooltip class="item" :ref="'menu'+subItem.coopera_id" effect="dark" :disabled="subItem.disabled" @mouseenter.native="tipMouseenter(subItem)" :content="subItem.coopera_name" placement="right-start">
+                                <div class="menu-item-title level2-title">
+                                  <!-- <div class="dot"></div>
+                                  <span>{{subItem.coopera_name}}</span> -->
+                                  {{subItem.coopera_name}}
+                                </div>
+                              </el-tooltip>
+                            </template>
+                          </el-menu-item>
+                      </el-submenu>
+                    </template>
+                    <template v-else>
+                        <el-menu-item :index="index+''" @click="clickMenuItem(item)">
+                          <el-tooltip class="item" :ref="'menu'+item.coopera_id" @mouseenter.native="tipMouseenter(item)" :disabled="item.disabled" effect="dark" :content="item.coopera_name" placement="right-start">
+                            <div class="menu-title">{{item.coopera_name}}</div>
+                          </el-tooltip>
+                        </el-menu-item>
+                    </template>
+                  </div>
+                </el-menu>
+                <div class="no-menu-con" v-else>
+                  <div class="menu-absolute-center">
+                    <span class="text">暂无合作社信息</span>
+                  </div>
+                </div>
+            </el-scrollbar>
+          </div>
+          <div class="right-con" >
+            <el-scrollbar wrap-class="scrollbar-wrapper">
+              <div class="operate-con clearfix">
+                <div class="search-con"  >
+                    <el-form class="clearfix"  label-width="65px">
+                        <el-form-item label="规则名称">
+                            <el-input v-model="ruleName" placeholder="请输入规则名称" clearable></el-input>
+                        </el-form-item>
+                        <el-button  type="primary" size="small" :loading="loading" @click="search()">{{loading ? '获取数据中...' : '查询'}}</el-button>
+                    </el-form>
+                </div>
+                <div class="btn-con" v-if="cooperationInfo && cooperationInfo.id == cooperaId && isAdd">
+                    <el-button style="margin-left:15px" slot="trigger" size="small"  type="primary"  @click="addPointSetting()" >添加配置</el-button>
+                </div>
+              </div>
+              <div class="info-con">
+                  <template v-if="data && data.length > 0">
+                      <el-table :data="data" border >
+                        <el-table-column prop="inter_id" label="ID" width="70" align="center" ></el-table-column>
+                        <el-table-column prop="name" label="积分配置名称" align="center"></el-table-column>
+                        <el-table-column prop="coopera_name" label="所属合作社" width="200" show-overflow-tooltip v-if="isAdmin"  align="center"></el-table-column>
+                        <el-table-column prop="type" label="积分类型" align="center"></el-table-column>
+                        <el-table-column prop="inter_type_name" label="积分累计方式" align="center"></el-table-column>
+                        <el-table-column label="积分兑换比例" align="center">
+                            <template slot-scope="scope">
+                                <span v-if="scope.row.inter_id == 2">{{scope.row.money + ' : ' + scope.row.num}}</span>
+                                <span v-if="scope.row.inter_id == 1">{{scope.row.num}}</span>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="note" label="备注" align="center"></el-table-column>
+                        <el-table-column prop="add_time" label="创建时间" align="center" width="140"></el-table-column>
+                        <el-table-column prop="worker_name" label="创建人" align="center"></el-table-column>
+                        <el-table-column  label="操作" align="center" v-if="isEdit && adminType == 3" width="100">
+                            <template slot-scope="scope">
+                                <template v-if="cooperationInfo && cooperationInfo.id == scope.row.coopera_id">
+                                    <el-button plain type="primary" size="small"  @click="editPointSetting(scope.row)">编辑</el-button>
+                                </template>
+                                <template v-else>
+                                    <span>- -</span>
+                                </template>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+                  </template>
+                  <div class="page-con">
+                    <el-pagination @current-change="handleCurPageChange" v-if="totalPage && totalPage > 0" background :current-page="curPage" layout="prev, pager, next" :total="totalPage*10"> </el-pagination>
+                  </div>
+                  <div style="height:5rem"></div>
+                  <div v-if="!data || data.length == 0">
+                    <template v-if="!data || data.length == 0">
+                      <div class="no-data-con" >
+                          <div class="absolute-center">
+                              <div class="err-info-text ">暂无积分配置</div>
+                          </div>
+                      </div>
+                    </template>
+                  </div>
+              </div>
+            </el-scrollbar>
+          </div>
+        </div>
+      </template>
+      <template v-else>
+          <div class="breadcrumb-con">
+			<img class="left-icon" src="../../images/breadcrumb-left-icon.png" alt="">
+			<div class="breadcrumb-info">
+				<el-breadcrumb separator-class="el-icon-arrow-right">
+					<el-breadcrumb-item>{{adminType == 1 ? '供应商城' : '合作商城'}}</el-breadcrumb-item>
+					<el-breadcrumb-item  class="breadcrumb-tit">积分配置</el-breadcrumb-item>
+				</el-breadcrumb>
+			</div>
+			<el-button size="small" @click="initData()">刷新</el-button>
+		</div>
+		<div class="operate-con clearfix">
+            <div class="search-con">
+                <el-form class="clearfix"  label-width="65px">
+					<el-form-item label="合作社" v-if="isAdmin">
+						<el-select v-model="cooperaId" filterable placeholder="请选择合作社">
+							<el-option v-for="(item,index) in cooperativeList" :key="index" :label="item.coopera_name" :value="item.coopera_id"></el-option>
+						</el-select>
+					</el-form-item>
+                    <el-form-item label="规则名称">
+                        <el-input v-model="ruleName" placeholder="请输入规则名称" clearable></el-input>
+                    </el-form-item>
+                    <el-button  type="primary" size="small" :loading="loading" @click="search()">{{loading ? '获取数据中...' : '查询'}}</el-button>
+                </el-form>
+            </div>
+            <div class="btn-con" v-if="!loading">
+                <el-button slot="trigger" size="small"  type="primary" v-if="isAdd" @click="addPointSetting()" >添加配置</el-button>
+            </div>
+		</div>
+        <div class="table-con">
+            <template v-if="data && data.length > 0">
+                <el-table :data="data" border >
+					<el-table-column prop="inter_id" label="ID" width="70" align="center" ></el-table-column>
+                    <el-table-column prop="name" label="积分配置名称" align="center"></el-table-column>
+                    <el-table-column prop="coopera_name" label="所属合作社" width="200" show-overflow-tooltip v-if="isAdmin"  align="center"></el-table-column>
+                    <el-table-column prop="type" label="积分类型" align="center"></el-table-column>
+                    <el-table-column prop="inter_type_name" label="积分累计方式" align="center"></el-table-column>
+                    <el-table-column label="积分兑换比例" align="center">
+                        <template slot-scope="scope">
+                            <span v-if="scope.row.inter_id == 2">{{scope.row.money + ' : ' + scope.row.num}}</span>
+                            <span v-if="scope.row.inter_id == 1">{{scope.row.num}}</span>
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="note" label="备注" align="center"></el-table-column>
+                    <el-table-column prop="add_time" label="创建时间" align="center" width="140"></el-table-column>
+                    <el-table-column prop="worker_name" label="创建人" align="center"></el-table-column>
+                    <el-table-column  label="操作" align="center" v-if="isEdit" width="100">
+						<template slot-scope="scope">
+							<el-button plain type="primary" size="small"  @click="editPointSetting(scope.row)">编辑</el-button>
+						</template>
+					</el-table-column>
+                </el-table>
+            </template>
+            <template v-if="!data || data.length == 0">
+                <div class="no-data-con" >
+                    <div class="absolute-center">
+                        <div class="err-info-text ">暂无积分规则列表</div>
+                    </div>
+                </div>
+            </template>
+            <el-pagination @current-change="handleCurPageChange" v-if="totalPage && totalPage > 0" background :current-page="curPage" layout="prev, pager, next" :total="totalPage*10"> </el-pagination>
+        </div>
+      </template>
+		
+
+        <el-dialog :title="(ruleForm.inter_id ? '编辑' : '添加') + '积分配置'" :visible.sync="formDialog" :close-on-click-modal="false" :close-on-press-escape="false">
+			<el-form ref="ruleForm" :model="ruleForm" :rules="rules" label-width="100px">
+				<el-form-item label="规则名称" prop="name">
+					<el-input v-model="ruleForm.name" placeholder="请输入规则名称"></el-input>
+				</el-form-item>
+                <el-form-item label="积分规则" prop="inter_type">
+					<el-select v-model="ruleForm.inter_type" filterable placeholder="请选择积分规则">
+                        <el-option v-for="(item,index) in interTypeList" :key="index" :label="item.name" :value="item.id"></el-option>
+                    </el-select>
+				</el-form-item>
+                <el-form-item label="金额" prop="money" v-if="ruleForm.inter_type == 1">
+					<el-input v-model="ruleForm.money" placeholder="请输入金额"></el-input>
+				</el-form-item>
+                <el-form-item label="积分数" prop="num">
+					<el-input v-model="ruleForm.num" placeholder="请输入积分数"></el-input>
+				</el-form-item>
+			</el-form>
+			<div slot="footer" class="dialog-footer">
+				<el-button @click="formDialog = false">取 消</el-button>
+				<el-button type="primary" @click="submitForm('ruleForm')" :loading="submitLoading">确 定</el-button>
+			</div>
+		</el-dialog>
+    </div>
+</template>
+<script>
+
+export default {
+  name: "pointSetting",
+  data() {
+    var checkNum = (rule, value, callback) => {
+        if (!value) {
+            return callback(new Error('请输入数字'));
+        }
+        let numReg = /^[0-9]*[1-9][0-9]*$/;
+        if (!numReg.test(value)) {
+        callback(new Error('请输入正确的数字'));
+        } else {
+            callback();
+        }
+    }
+    var checkPrice = (rule, value, callback) => {
+        if (!value) {
+            return callback(new Error('请输入金额'));
+        }
+        let priceReg = /^\d+$|^\d*\.\d+$/;
+        if (!priceReg.test(value)) {
+        callback(new Error('请输入正确的金额'));
+        } else {
+            callback();
+        }
+    };
+    return {
+	  ruleName: '',
+      data: [],
+	  curPage: 1,
+	  totalPage: null,
+      loading: false,
+
+      ruleForm: {
+          name: '',
+          inter_type: '',
+          type: 1 , //1-商城积分
+          money: '',
+          num: '',
+          inter_id: '',
+      },
+      rules: {
+        name: [
+            { required: true, message: "请输入规则名称", trigger: "blur" }
+        ],
+        inter_type: [
+            { required: true, message: "请选择积分规则规则", trigger: "change" }
+        ],
+        money: [
+            { required: true, validator: checkPrice, trigger: "blur" }
+        ],
+        num: [
+            { required: true, validator: checkNum, trigger: "blur" }
+        ]
+      },
+      interTypeList: [{
+          name: '交易额累计',
+          id: '1'
+      },{
+          name: '交易次数',
+          id: '2'
+      }],
+
+      formDialog: false,
+      submitLoading: false,
+
+      isEdit: false,//是否有编辑权限
+      isAdd: false,// 是否有添加权限
+
+      isAdmin: false, // 是否为管理员
+      adminType: '', // 管理员类型
+      cooperaId: '', //合作社id
+      cooperativeList:[],
+      
+      activeMenu: '0',
+      activeMenuArr: [],
+      adminLoading: false,
+      cooperationInfo: '',
+    };
+  },
+  activated() {
+    this.loading = true
+
+    //判断是否为管理员
+    let adminType = localStorage.getItem('is_admin')
+    if(adminType && Number(adminType) >= 1) {
+        this.isAdmin = true
+        this.adminType = adminType
+    }
+    if(this.isAdmin) {
+        this.cooperationInfo = localStorage.getItem('cooperationInfo') ? JSON.parse(localStorage.getItem('cooperationInfo')) : ''
+        this.utils.getCooperativeList(this, data =>{
+          if(data && data.length > 1 && adminType == 3) {
+              this.cooperaId = data[1].coopera_id
+          } else {
+              this.cooperaId = ''
+          }
+          data.forEach(item =>{
+              item.children = []
+              item.disabled = true
+          })
+          this.cooperativeList = data
+          this.initData()
+        },err =>{
+            this.loading = false
+        })
+    } else {
+        this.initData()
+    }
+    this.handlePermission()
+  },	
+  methods: {
+	// 初始化信息
+	initData() {
+        this.data = []
+        this.curPage = 1
+        this.totalPage = null
+        this.ruleName = ''
+        if(this.cooperativeList && this.cooperativeList.length > 1 && this.adminType == 3) {
+            this.cooperaId = this.cooperativeList[1].coopera_id
+        } else {
+            this.cooperaId = ''
+        }
+        this.initActive()
+        this.getPointSettingList()
+    },
+    // 初始化默认合作社
+    initActive() {
+      if(this.adminType == 3) {
+         if(!this.cooperativeList || this.cooperativeList.length < 1) return
+         this.activeMenu = '-1'
+        this.$nextTick(() =>{
+          this.activeMenu = '1'
+        })
+        // this.getLevel2Data('1',() =>{
+        //     this.$nextTick(() =>{
+        //       this.activeMenu = '1-0'
+        //     })
+        // })
+      } else {
+        // 勿删 直接赋值为0不起作用
+        this.activeMenu = '-1'
+        this.$nextTick(() =>{
+          this.activeMenu = '0'
+          this.activeMenuArr = []
+        })
+      }
+    },
+    // 合作社导航展开
+    handleOpen(index) {
+      if(this.cooperativeList[index].children.length > 0) return
+      this.getLevel2Data(index)
+    },
+    // 获取子级合作社列表
+    getLevel2Data(index,callBack){
+      this.ajax(
+        "cooperativeLevelList",{ parent_id: this.cooperativeList[index].coopera_id },"获取合作社列表失败",res => {
+          if (res.errno == 0) {
+            res.data.forEach(item  =>{
+              item.disabled = true
+            })
+            this.activeMenu = index
+              this.cooperativeList[index].children = res.data
+              callBack && typeof callBack == 'function' && callBack()
+          } else {
+              this.cooperativeList[index].children = []
+          }
+        },err => {
+            this.cooperativeList[index].children = []
+        }
+      );
+    },
+    // 点击合作社获取数据
+    clickMenuItem(item) {
+      this.data = []
+      this.curPage = 1
+      this.totalPage = null
+      if(this.cooperaId) {
+        if(this.cooperaId == item.coopera_id) return
+      }
+      this.data = []
+      this.curPage = 1
+      this.totalPage = null
+      this.cooperaId = item.coopera_id
+      this.getPointSettingList()
+    },
+    // dom移动事件
+    tipMouseenter(item) {
+      let isOverflow = this.$refs['menu'+item.coopera_id];
+      let cWidth = isOverflow[0].$el.clientWidth;
+      let sWidth = isOverflow[0].$el.scrollWidth;
+      if (sWidth > cWidth) { //超过 
+      this.$set(item, 'disabled', false);
+      } else {
+        this.$set(item, 'disabled', true);
+      }
+    },
+    // 判断当前页面都有什么权限
+	handlePermission() { 
+		let that = this;
+		that.utils.getPermissionList(that,data =>{
+			data.forEach(item =>{
+				if(item.title == '编辑') {
+					that.isEdit = true
+				}	
+				if(item.title == '添加') {
+					that.isAdd = true
+				}	
+			})
+		})
+	},
+    // 搜索
+    search() {
+        this.data = []
+        this.curPage = 1
+        this.totalPage = null
+        this.getPointSettingList()
+    },
+	// 获取积分规则列表
+	getPointSettingList(isAddEdit) {
+        let that = this
+        if(isAddEdit) {
+            that.adminLoading = false
+            that.loading = false
+        } else {
+            if(that.isAdmin) {
+                that.adminLoading = true
+            } else {
+                that.loading = true
+            }
+        }
+		that.ajax('interLIsts',{
+            page: that.curPage,
+			size: 10,
+			name: that.ruleName,
+			coopera_id: that.cooperaId
+        },'获取积分规则列表失败',res =>{
+            that.loading = false
+            that.adminLoading = false
+			if(res.errno == 0) {
+                that.curPage = Number(res.data.current_page)
+				that.totalPage = res.data.total
+				that.data = res.data.data
+			}
+		}, err =>{
+            that.loading = false
+            that.adminLoading = false
+		})
+    },
+    // 添加规则
+    addPointSetting() {
+        this.ruleForm = {
+          name: '',
+          inter_type: '',
+          type: 1 , //1-商城积分
+          money: '',
+          num: '',
+          inter_id: '',
+        }
+        this.formDialog = true
+    },
+     // 编辑规则
+    editPointSetting(row) {
+        this.ruleForm = {
+          name: row.name,
+          inter_type: row.inter_type+'',
+          type: 1 , //1-商城积分
+          money: row.money,
+          num: row.num,
+          inter_id: row.inter_id,
+        }
+        this.formDialog = true
+    },
+    // 提交添加修改form
+    submitForm(formName) {
+        let that = this
+        that.$refs[formName].validate((valid) => {
+          if (valid) {
+			  that.submitLoading = true
+			  let params = JSON.parse(JSON.stringify(that.ruleForm))
+              that.ajax(params.inter_id ? 'interEdit' : 'interAdd',params,(params.inter_id ? '编辑' : '添加') +'积分规则失败',res =>{
+                that.submitLoading = false
+                if(res.errno == 0) {
+                    that.$message.success((params.inter_id ? '编辑' : '添加')+'积分规则成功')
+                    that.getPointSettingList(true)
+                    that.formDialog = false
+                }
+              }, err =>{
+                   that.submitLoading = false
+              })
+          } else {
+            setTimeout(()=>{
+                let isError= document.getElementsByClassName("is-error");
+                let firstErrInput = isError[0].querySelector('input')
+				firstErrInput.focus();
+            },100);
+            return false;
+          }
+        });
+    },
+    // 处理分页
+	handleCurPageChange(val) {
+		this.curPage = val;
+		this.getPointSettingList()
+	},
+  }
+};
+</script>
+<style lang="less">
+.point-setting {
+  padding: 20px;
+  .el-pagination{
+        float: right;
+        margin-top: 30px;
+        margin-bottom: 30px;
+	}
+	.operate-con {
+	  padding: 10px 0;
+    .search-con {
+	  float: left;
+	  width: 80%;
+	  .el-form-item {
+		width: 28%;
+		float: left;
+		margin-bottom: 0;
+		.el-form-item__label {
+			font-size: 0.9rem;
+		}
+		.el-form-item__content {
+			margin-right: 30px;
+			.el-input {
+			width: 100%;
+			.read-idCard {
+				color: #3B6AF1;
+				background: #F0F8FF;
+				font-size: 0.75rem;
+				cursor: pointer;
+			}
+		}
+		}
+		
+	}
+    }
+    .btn-con {
+      float:right;
+    }
+  }
+    .table-con {
+	
+    }
+    .el-dialog {
+        width: 30%;
+		.el-form {
+			padding: 0 1rem;
+			.el-form-item__content {
+				.el-input {
+					width: 100%;
+				}
+			}
+        }
+	}
+ 
+}
+.admin-tmp-con { 
+  padding: 0;
+  width: 100%; 
+  height: 100%; 
+  display: flex;
+  flex-direction: column;
+  .breadcrumb-con {
+    margin-bottom: 0;
+  }
+  .admin-con {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    .org-menu-con {
+      width: 16rem;
+      height: 100%;
+      background: #F8FCFF;
+      .level2-title {
+          color: #8F9BA7;
+      }
+      .level2-title::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 35px;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #8F9BA7;
+        transform: translateY(-50%);
+      }
+      .is-opened {
+        .el-icon-arrow-down {
+          color: #409EFF;
+        }
+        .is-active {
+          .level2-title {
+            color: #409EFF;
+          }
+          .level2-title::after {
+            background: #409EFF;
+          }
+        }
+        
+      }
+      .is-active {
+        background: #fff!important;
+      }
+      .menu-title {
+        width: 10rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .menu-item-title {
+        width: 7.5rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+       .no-menu-con {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        .menu-absolute-center {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%,-50%);
+          .text {
+            font-size: 0.9rem;
+            color: #999;
+
+          }
+        }
+      }
+    }
+    .right-con {
+      position: relative;
+      width: calc(100% - 16rem);
+      height: 99%;
+      padding: 10px;
+      .info-con {
+        position: relative;
+        width: 100%;
+        padding-top: 10px;
+      }
+      .operate-con {
+        padding: 0;
+      }
+      .operate-con+.el-table {
+        margin-top: 10px;
+      }
+    }
+    
+    .hide-menu {
+      width: 54px;
+    }
+    .page-con {
+      position: absolute;
+      bottom: 0;
+      right: 5rem;
+    }
+  }
+}
+
+</style>

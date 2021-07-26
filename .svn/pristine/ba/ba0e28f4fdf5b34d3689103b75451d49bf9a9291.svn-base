@@ -1,0 +1,480 @@
+<template>
+    <div class="accounting-title-list"  v-loading="loading">
+		<div class="breadcrumb-con">
+			<img class="left-icon" src="../../images/breadcrumb-left-icon.png" alt="">
+			<div class="breadcrumb-info">
+				<el-breadcrumb separator-class="el-icon-arrow-right">
+					<el-breadcrumb-item>系统配置</el-breadcrumb-item>
+					<el-breadcrumb-item  class="breadcrumb-tit">科目配置</el-breadcrumb-item>
+				</el-breadcrumb>
+			</div>
+			<el-button size="small" @click="initData()">刷新</el-button>
+		</div>
+		<div class="operate-con clearfix">
+			<div class="search-con">
+				<el-form class="clearfix"  label-width="100px">
+					<el-form-item label="子级科目名称">
+						<el-input v-model="searchName" placeholder="请输入子级科目名称" clearable @clear="search()" @keyup.enter.native="search()" @input="bindInput" ></el-input>
+					</el-form-item>
+					<el-button type="primary" size="small" :loading="loading" @click="search()">{{loading ? '获取数据中...' : '查询'}}</el-button>
+				</el-form>
+			</div>
+		</div>
+        <div class="table-con">
+            <template v-if="searchName">
+                <template v-if="searchData && searchData.length > 0">
+                    <el-table :data="searchData" border >
+                        <el-table-column prop="id" label="ID" width="60px"></el-table-column>
+                        <el-table-column prop="title" label="科目名称" ></el-table-column>
+                        <el-table-column prop="code" label="科目编号" ></el-table-column>
+                         <el-table-column prop="level" label="科目级别" ></el-table-column>
+                        <el-table-column  label="所属科目" align="center" >
+                            <template slot-scope="scope">
+                                <el-breadcrumb separator-class="el-icon-arrow-right">
+                                    <el-breadcrumb-item v-for="(item,index) in scope.row.pdata" :key="index"  >{{item && item.title ? item.title : ''}}</el-breadcrumb-item>
+                                </el-breadcrumb>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="type" label="科目类别" ></el-table-column>
+                    </el-table>
+                </template>
+                <template v-if="!searchData || searchData.length == 0">
+                    <div class="no-data-con" >
+                        <div class="absolute-center">
+                            <div class="err-info-text ">暂无搜索结果</div>
+                        </div>
+                    </div>
+                </template>
+            </template>
+            <template v-else>
+                <template v-if="data && data.length > 0">
+                    <el-tree ref="tree" :data="data" node-key="id" :props="defaultProps" :expand-on-click-node="false" :load="loadNode" lazy>
+                        <div class="custom-tree-node" slot-scope="{ node, data }">
+                            <span class="tit">{{ node.label }}</span>
+                            <div class="btn-con">
+                                <el-button size="mini" type="primary" @click="addData(node,data)" >添加科目</el-button>
+                                <el-button v-if="node.level != 1" size="mini"  type="warning" @click="editData(node,data)">编辑</el-button>
+                            </div>
+                        </div>
+                    </el-tree>
+                    <!-- <el-table :data="data" border >
+                        <el-table-column type="expand" >
+                            <template slot-scope="props">
+                                <div class="inner-table-tit-con">
+                                    <div class="inner-table-tit">【{{props.row.title}}】 的二级科目列表</div>
+                                </div>
+                                <el-table :data="props.row.two" border class="inner-table" header-row-class-name ="inner-table-header" >
+                                    <el-table-column prop="id" label="ID" width="60px"></el-table-column>
+                                    <el-table-column prop="title" label="二级科目名称" ></el-table-column>
+                                    <el-table-column prop="code" label="科目编号" ></el-table-column>
+                                    <el-table-column prop="type" label="科目类型" ></el-table-column>
+                                    <el-table-column  label="操作" align="center" >
+                                        <template slot-scope="scope">
+                                            <el-button type="primary" plain size="small" >编辑</el-button>
+                                        </template>
+                                    </el-table-column>
+                                </el-table>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="id" label="ID" width="60px"></el-table-column>
+                        <el-table-column prop="title" label="一级科目名称" ></el-table-column>
+                        <el-table-column prop="code" label="科目编号" ></el-table-column>
+                        <el-table-column prop="type" label="科目类型" ></el-table-column>
+                        <el-table-column  label="操作" align="center" >
+                            <template slot-scope="scope">
+                                <el-button type="primary" plain size="small" >添加二级科目</el-button>
+                            </template>
+                        </el-table-column>
+                    </el-table> -->
+                </template>
+                <template v-if="!data || data.length == 0">
+                    <div class="no-data-con" >
+                        <div class="absolute-center">
+                            <div class="err-info-text ">暂无科目列表</div>
+                        </div>
+                    </div>
+                </template>
+            </template>
+            <el-pagination @current-change="handleCurPageChange" v-if="totalPage && totalPage > 0" background :current-page="curPage" layout="prev, pager, next" :total="totalPage*10"> </el-pagination>
+        </div>
+
+        <el-dialog :title="(ruleForm.id ? '编辑' : '添加') +'科目'" :visible.sync="isShowFormDialog"  >
+            <el-form :model="ruleForm" :rules="rules" ref="ruleForm" label-width="100px">
+                <el-form-item label="所属科目:" >
+                    <el-input v-model="ruleForm.p_title" readonly></el-input>
+                </el-form-item>
+                <el-form-item label="科目名称:" prop="title" >
+                    <el-input v-model="ruleForm.title" placeholder="请输入科目名称"></el-input>
+                </el-form-item>
+                <el-form-item label="使用说明:" >
+                    <el-input v-model="ruleForm.note" placeholder="请输入科目名称"></el-input>
+                </el-form-item>
+            </el-form>
+            <div slot="footer" class="dialog-footer">
+                <el-button @click="isShowFormDialog = false">取 消</el-button>
+                <el-button type="primary" @click="submitForm('ruleForm')" :loading="submitLoading">确 定</el-button>
+            </div>
+        </el-dialog>
+    </div>
+</template>
+<script>
+export default {
+  name: "accountingTitleList",
+  data() {
+    return {
+	  searchName: '',
+      lastSearch: '',
+      curPage: 1,
+      totalPage: null,
+      data: [],
+      defaultProps: {
+        children: 'two',
+        label: 'title'
+      },
+      ruleForm: {
+          p_code: '',
+          title: '',
+          id:'',
+          level:'',
+          note: '',
+          type: '',
+      },
+      rules: {
+        title: [
+            { required: true, message: '请输入科目名称', trigger: 'blur' }
+        ]
+      },
+      parentData:'',
+      curData: '',
+
+      isShowFormDialog: false,
+      
+      loading: false,
+      submitLoading: false,
+
+      searchData: [],// 搜索结果
+      
+	  isEdit: false,// 是否有编辑权限
+      isDel: false, //是否有删除权限
+      isAdd: false, //是否有添加权限
+    };
+  },
+  activated() {
+	  this.initData()
+  },	
+  methods: {
+	// 初始化信息
+	initData() {
+      this.searchName = '';
+      this.curPage = 1;
+      this.totalPage = null;
+      this.submitLoading = false;
+	  this.data = [];
+	  this.getAccountingTitleList()
+	  this.handlePermission()
+	},
+	// 查询
+	search() {
+        this.curPage = 1;
+        this.totalPage = null;
+        this.data = [];
+        if(this.searchName) {
+            this.getSearchData()
+        } else {
+            this.getAccountingTitleList()
+        }
+    },
+    bindInput(val) {
+       this.searchData = []
+    },
+    // 获取搜索数据
+    getSearchData() {
+        let that = this
+        if(that.loading) return
+        that.loading = true
+		that.ajax('accountingTitleSearch',{
+            title: that.searchName
+        },'搜索科目失败',res =>{
+			that.loading = false
+			if(res.errno == 0) {
+                that.searchData = res.data.data
+                that.curPage = Number(res.data.current_page)
+                that.totalPage = res.data.total
+			} 
+		}, err =>{
+            that.loading = false
+		})
+    },
+     // 处理分页
+	handleCurPageChange(val) {
+		this.curPage = val;
+		this.getSearchData()
+	},
+	// 判断当前页面都有什么权限
+	handlePermission() { 
+		let that = this;
+		that.utils.getPermissionList(that,data =>{
+			data.forEach(item =>{
+				if(item.title == '编辑') {
+					that.isEdit = true
+                }	
+                if(item.title == '删除') {
+					that.isDel = true
+                }	
+                if(item.title == '添加') {
+					that.isAdd = true
+				}	
+			})
+		})
+    },
+    // 加载数据
+    loadNode(node, resolve) {
+        if(node.level == 0) {
+            this.getAccountingTitleList(null, data =>{
+                resolve(data)
+            })
+        } else {
+             this.getAccountingTitleList(node.data.code, data =>{
+                 if(data && data.length > 0) {
+                    resolve(data)
+                 } else {
+                     resolve([])
+                 }
+            })
+        }
+    },
+	// 获取科目列表
+	getAccountingTitleList(code,callBack) {
+		let that = this
+		if(code) {
+			that.loading = false;
+		} else {
+			that.loading = true;
+        }
+        let params = {}
+        if(code) {
+            params.code = code
+        } else {
+            params.level = 1
+        }
+		that.ajax('accountingTitleList',params,'获取科目列表失败',res =>{
+			that.loading = false
+			if(res.errno == 0) {
+                if(code) {
+                    callBack && typeof callBack == 'function' && callBack(res.data)
+                } else {
+                    that.data = res.data
+                    callBack && typeof callBack == 'function' && callBack(res.data)
+                }
+                //  callBack && typeof callBack == 'function' && callBack(res.data)
+			} else{
+                 callBack && typeof callBack == 'function' && callBack([])
+            } 
+		}, err =>{
+            that.loading = false
+            callBack && typeof callBack == 'function' && callBack([])
+		})
+    },
+   
+    // 添加科目
+    addData(node,data) {
+        // this.curData = data
+        this.curNode = node
+        this.ruleForm = {
+            p_code: data.code,
+            p_title: data.title,
+            title: '',
+            id: '',
+            level: node.level + 1,
+            note: '',
+            type: data.type,
+        }
+        this.isShowFormDialog = true
+    },
+    editData(node,data) {
+        let parentData = node.parent.data
+        this.parentData = parentData
+        this.curData = data
+        this.ruleForm = {
+            p_code: parentData.code,
+            p_title: parentData.title,
+            title: data.title,
+            id: data.id,
+            level: data.level,
+            note: data.note,
+            type: parentData.type,
+        }
+        this.isShowFormDialog = true
+        // this.$forceUpdate()
+    },
+    // 科目提交
+    submitForm(formName) {
+        let that = this
+        that.$refs[formName].validate((valid) => {
+        if (valid) {
+            let params = JSON.parse(JSON.stringify(that.ruleForm))
+            that.submitLoading = true
+            that.ajax('accountingTitleAdd',params,(params.id ? '修改' : '添加')+ '科目失败',res =>{
+                that.submitLoading = false
+                if(res.errno == 0) {
+                    that.$message.success((params.id ? '修改' : '添加') +'科目成功')
+                    if(params.id) {
+                        that.$set(that.curData,'title', that.ruleForm.title)
+                        that.$set(that.curData,'p_title', that.ruleForm.p_title)
+                        that.$set(that.curData,'p_code', that.ruleForm.p_code)
+                        that.$set(that.curData,'level', that.ruleForm.level)
+                        that.$set(that.curData,'note', that.ruleForm.note)
+                        that.$set(that.curData,'type', that.ruleForm.type)
+                        that.$set(that.curData,'note', that.ruleForm.note)
+                    } else {
+                        that.ruleForm.id = res.data.id
+                        that.ruleForm.code = res.data.code
+                        that.$refs['tree'].append(JSON.parse(JSON.stringify(that.ruleForm)),that.curNode);
+                    }
+                    that.isShowFormDialog = false
+                    
+                }
+            }, err =>{
+                that.submitLoading = false
+            })
+        } else {
+            setTimeout(()=>{
+                let isError= document.getElementsByClassName("is-error");
+                let firstErrInput = isError[0].querySelector('input')
+                if(firstErrInput.type == 'file') {
+                    document.querySelectorAll('.el-scrollbar__wrap')[1].scrollTop = 50
+                } else {
+                    firstErrInput.focus();
+                }
+            },100);
+            return false;
+        }
+        });
+    },
+  }
+};
+</script>
+<style lang="less">
+.accounting-title-list {
+  padding: 20px;
+  .el-pagination{
+        float: right;
+        margin-top: 30px;
+        margin-bottom: 30px;
+	}
+	.operate-con {
+	  padding: 10px 0;
+    .search-con {
+	  float: left;
+	  width: 80%;
+	  .el-form-item {
+		width: 28%;
+		float: left;
+		margin-bottom: 0;
+		.el-form-item__label {
+			font-size: 0.9rem;
+		}
+		.el-form-item__content {
+			margin-right: 30px;
+			.el-input {
+			width: 100%;
+			.read-idCard {
+				color: #3B6AF1;
+				background: #F0F8FF;
+				font-size: 0.75rem;
+				cursor: pointer;
+			}
+		}
+		}
+		
+	}
+    }
+    .btn-con {
+      float:right;
+    }
+  }
+    .table-con {
+		.inner-table-tit-con {
+			display: flex;
+			align-content: center;
+			justify-content: space-between;
+			.inner-table-tit {
+				flex: 1;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-weight: bold;
+				font-size: 1.2rem;
+				padding-bottom: 1.25rem;
+				text-align: center;
+				.btn-con {
+					display: flex;
+					align-items: center;
+					justify-content: center;
+				}
+			}
+		}	
+        
+        .inner-table {
+            thead {
+                tr th{
+                    background: #f9f9f9!important;
+                }
+            }
+        }
+    }
+    .el-tree-node__content {
+        height: auto;
+    }
+    .custom-tree-node {
+        display: flex;
+        align-items: center;
+        background: #f5f7fa;
+        padding: 10px 20px;
+        border-radius: 5px;
+        margin-bottom: 10px;
+        // min-height: 50px;
+        .tit {
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        .btn-con {
+            margin-left: 50px;
+            display: flex;
+            align-items: center;
+        }
+    }
+    .el-dialog {
+        width: 40%;
+		.el-form {
+			padding: 0 2rem;
+			.el-form-item__content {
+				.el-select {
+					.el-input {
+						width: 100%;
+					}
+				}
+				.el-input {
+					width: 60%;
+				}
+			}
+		}
+	}
+        .el-tree-node:focus{
+            .el-tree-node__content {
+                background-color: transparent;
+            }
+            .custom-tree-node {
+                background: #F0F8FF;
+            }
+        }
+        .el-tree-node__content:hover {
+            background-color: transparent;
+        }
+        .custom-tree-node:hover {
+            background: #F0F8FF;
+        }
+    }
+ 
+
+</style>

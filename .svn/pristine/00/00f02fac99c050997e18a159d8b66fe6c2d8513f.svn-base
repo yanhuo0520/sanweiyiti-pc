@@ -1,0 +1,439 @@
+<template>
+    <div class="depositAmount">
+        <el-form ref="ruleForm" :model="ruleForm" :rules="rules" label-width="100px">
+            <div class="breadcrumb-con">
+                <img class="left-icon" src="../../images/breadcrumb-left-icon.png" alt="">
+                <div class="breadcrumb-info">
+                    <el-breadcrumb separator-class="el-icon-arrow-right">
+                        <el-breadcrumb-item>互助金业务</el-breadcrumb-item>
+                        <el-breadcrumb-item  class="breadcrumb-tit">互助金存入</el-breadcrumb-item>
+                    </el-breadcrumb>
+                </div>
+            </div>
+             <div class="form-item-con clearfix" style="margin-top:50px">
+                <el-form-item label="互助金卡号:" prop="passbook_num">
+                    <el-input v-model="ruleForm.passbook_num" placeholder="请输入互助金卡号" clearable :readonly="isRead">
+                        <template #append>
+                            <span class="read-idCard" @click="readBankNo()">读卡号</span>
+                        </template>
+                    </el-input>
+                </el-form-item>
+                <el-button  type="primary" @click="findcard()" size="small" >查找</el-button>
+            </div>
+            <template v-if="ruleForm.relation_id">
+                <div class="tit-con">
+                    <div class="shu"></div>
+                    <span class="tit">互助金存入</span>
+                    <div class="bg"></div>
+                </div>
+                <div class="form-item-con clearfix">
+                    <el-form-item label="凭证号:" prop="save_proof">
+                        <el-input v-model="ruleForm.save_proof" clearable readonly></el-input>
+                    </el-form-item>
+                    <el-form-item label="存入金额:" prop="money">
+                        <el-input v-model="ruleForm.money" placeholder="请输入您的存入金额" clearable :readonly="isRead"></el-input>
+                    </el-form-item>
+                    <el-form-item label="存入日期:" prop="save_date">
+                        <el-date-picker type="date" value-format="yyyy-MM-dd" placeholder="请选择存入日期" v-model="ruleForm.save_date" style="width: 80%;" readonly></el-date-picker>
+                    </el-form-item>
+                    <el-form-item label="存入类型:" prop="save_type_id">
+                        <el-select v-model="ruleForm.save_type_id" placeholder="请选择存入类型" @change="changeType" :disabled="isRead">
+                            <el-option v-for="(item,index) in typeOptions" :key="index" :label="item.type_name" :value="item.id"></el-option>
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="定期编号:" prop="fixdate_code">
+                        <el-input v-model="ruleForm.fixdate_code" clearable readonly></el-input>
+                    </el-form-item>
+                    <el-form-item label="入股期限:" prop="save_term_id" v-if="ruleForm.save_type_id!=3">
+                        <el-select v-model="ruleForm.save_term_id" placeholder="请选择入股期限" @change="changeQixian" :disabled="isRead">
+                            <el-option v-for="(item,index) in qixianOptions" :key="index" :label="item.term_name" :value="item.id"></el-option>
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="起息日期:" prop="start_rate_date">
+                        <el-date-picker type="date" value-format="yyyy-MM-dd" placeholder="请选择起息日期" v-model="ruleForm.start_rate_date" style="width: 80%;" readonly></el-date-picker>
+                    </el-form-item>
+                    <el-form-item label="利率:">
+                        <el-input v-model="lilv" clearable readonly></el-input>
+                    </el-form-item>
+                    <!-- <el-form-item label="到期日期:" prop="end_rate_date">
+                        <el-date-picker type="date" value-format="yyyy-MM-dd" placeholder="请选择到期日期" v-model="ruleForm.end_rate_date" style="width: 80%;"></el-date-picker>
+                    </el-form-item> -->
+                    <el-form-item label="密码:" prop="pwd">
+                        <el-input v-model="ruleForm.pwd" clearable type="password" :readonly="isRead"></el-input>
+                    </el-form-item>
+                </div>
+                <div class="btn-con">
+                    <el-button type="warning" round v-if="isRead">该卡状态暂不能存入</el-button>
+                    <el-button type="primary" round @click="submitForm('ruleForm')" :loading="submitLoading" v-else>{{submitLoading ? '提交中...' : '立即创建'}}</el-button>
+                </div>
+            </template>
+        </el-form>
+        <div class="iframe-absolute-con" v-if="showReadIc" @click="showReadIc = false">
+            <iframe @click.stop=""  class="ic-iframe" id="readIcIframeId"  frameborder="0"></iframe>
+        </div>
+    </div>
+</template>
+<script>
+export default {
+  name: "depositAmount",
+  data() {
+    return {
+      ruleForm: {
+        passbook_num: "", //互助金卡号
+        relation_id: '', // 关系id
+        save_proof: "", //凭证号
+        money: "", //存款金额
+        save_date: "", //存入日期
+        save_type_id: "", //存入类型
+        save_term_id: "", //入股期限
+        fixdate_code: "", //定期编号
+        start_rate_date: "", //定期起息日期
+        // end_rate_date: "", //定期到期日期
+        pwd:"",//密码
+      },
+      lilv: "", //利率
+      rules: {
+        passbook_num: [
+          { required: true, message: "请输入互助金卡号", trigger: "blur" }
+        ],
+        save_proof: [{ required: true, message: "请输入凭证号", trigger: "blur" }],
+        money: [
+          { required: true, message: "请输入存款金额", trigger: "blur" }
+        ],
+        save_date: [
+          { required: true, message: "请选择存入日期", trigger: "blur" }
+        ],
+        save_type_id: [
+          { required: true, message: "请选择存入类型", trigger: "blur" }
+        ],
+        save_term_id: [
+          { required: true, message: "请选择入股期限", trigger: "blur" }
+        ],
+        fixdate_code: [
+          { required: true, message: "请输入定期编号", trigger: "blur" }
+        ],
+        start_rate_date: [
+          { required: true, message: "请选择定期起息日期", trigger: "blur" }
+        ],
+        // end_rate_date: [
+        //   { required: true, message: "请选择定期到期日期", trigger: "blur" }
+        // ],
+        pwd: [
+          { required: true, message: "请输入密码", trigger: "blur" }
+        ]
+      },
+      typeOptions: [], //存入类型
+      qixianOptions: [], //入股期限
+      type_id: "",
+      info:{},
+
+      isFind:false,
+      showReadIc: false, // 读取卡号弹窗
+      icUuid: '', // IC卡芯片卡号
+
+      submitLoading: false,
+
+      isRead:false
+    };
+  },
+  created() {
+    window.addEventListener("message",(event)=>{
+         if(event.data && event.data.path && event.data.path == 'depositAmountReadIc') {
+            if(event.data.type == 'data') {
+                this.icUuid = event.data.data
+                this.getBankNo()
+                this.showReadIc = false	
+            }
+            if(event.data.type == 'close') {
+                this.showReadIc = false	
+            }
+        }
+    }, false)
+  },
+  activated() {
+    this.cunruType();
+    this.resetForm();
+    this.ruleForm.relation_id = ''
+    this.lilv = ''
+    let date = new Date();
+    let dd = this.$formatDate("YYYY-mm-dd HH:MM:SS", date);
+    this.ruleForm.save_date = dd.substring(0, 10);
+    this.ruleForm.start_rate_date = dd.substring(0, 10);
+    dd = dd.replace(/-/g, "");
+    dd = dd.replace(/:/g, "");
+    dd = dd.replace(/ /g, "");
+    this.ruleForm.save_proof = "P" + dd + this.$getRndInteger(1111,9999);
+    this.ruleForm.fixdate_code = dd + this.$getRndInteger(1111,9999);
+      this.isRead = false
+  },
+  
+  methods: {
+    // 重置表单
+    resetForm() {
+      this.$refs["ruleForm"].resetFields();
+    },
+     // 读卡号
+    readBankNo() {
+      this.showReadIc = true
+      this.ruleForm.passbook_num = ''
+      setTimeout(() =>{
+          document.getElementById('readIcIframeId').src='./static/autoGetCardSN.html?path=depositAmountReadIc';
+      },100)
+    },
+    // 根据IC芯片卡号获取卡号
+    getBankNo() {
+      let that = this;
+      that.ajax('searchICCard',{
+        uuid:that.icUuid
+      },'获取卡号失败',res => {
+          if (res.errno == 0) {
+            that.ruleForm.passbook_num  = res.data.card;
+            that.findcard()
+          }
+        });
+    },
+    //   存入类型查询
+    cunruType() {
+      this.ajax(
+        "passbookType",
+        {
+          type:2
+        },
+        "获取存入类型失败",
+        res => {
+          if (res.errno == 0) {
+            this.typeOptions = res.data;
+          }
+        },
+        err => {}
+      );
+    },
+    //   入股期限查询
+    rugu() {
+      this.ajax(
+        "passbookTerm",
+        {
+          type_id: this.type_id
+        },
+        "获取入股期限失败",
+        res => {
+          if (res.errno == 0) {
+            this.qixianOptions = res.data;
+            if(this.type_id == 3){
+              this.lilv = this.qixianOptions[0].rate + '‰'
+            }else{
+              this.lilv = ''
+            }
+          }
+        },
+        err => {}
+      );
+    },
+    // 选择存入类型
+    changeType(val) {
+      this.typeOptions.forEach(ele=>{
+        if(ele.id == val){
+          this.type_id = ele.id
+        }
+      })
+      
+      this.rugu();
+    },
+    // 选择入股期限
+    changeQixian(val) {
+      this.qixianOptions.forEach(ele=>{
+        if(ele.id == val){
+          this.lilv = ele.rate + "‰";
+        }
+      })
+      
+    },
+
+    findcard() {
+      if (this.ruleForm.passbook_num == "") {
+        this.$message.error("请输入互助金卡号");
+        return;
+      }
+      this.ruleForm.relation_id = ''
+      this.ajax(
+        "searchCard",
+        { card: this.ruleForm.passbook_num },
+        "查询失败",
+        res => {
+          if (res.errno == 0) {
+            if(res.data.passbook_status == 1){
+              this.$message.success("查找完成");
+              this.info = res.data;
+              this.ruleForm.relation_id = res.data.relation_id
+              this.isFind = true
+              this.isRead = false
+            }else if(res.data.passbook_status == 0){
+              this.$message.error('该卡已挂失，请补卡')
+              this.isRead = true
+            }else if(res.data.passbook_status == 2){
+              this.$message.error('该卡已删除')
+              this.isRead = true
+            }
+          } 
+        },
+        err => {}
+      );
+    },
+
+    submitForm(formName) {
+      this.$refs[formName].validate(valid => {
+        if (valid) {
+          this.submitLoading = true;
+          if (!this.isFind) {
+            this.$message.error("请查找互助金卡号确认是否有卡号");
+            return;
+          }
+          let param = JSON.parse(JSON.stringify(this.ruleForm))
+            param.passbook_num = this.info.passbook_num
+            param.pwd = this.utils.recursiveMD5(this.ruleForm.pwd, 1)
+          this.ajax('saveMoney',param,'存入失败',res=>{
+            this.submitLoading = false;
+            if(res.errno == 0){
+              this.$message(res.errmsg)
+              this.resetForm()
+              this.lilv = ''
+            }
+          },err=>{})
+        } else {
+          setTimeout(() => {
+            let isError = document.getElementsByClassName("is-error");
+            let firstErrInput = isError[0].querySelector("input");
+            if (firstErrInput.type == "file") {
+              document.querySelectorAll(
+                ".el-scrollbar__wrap"
+              )[1].scrollTop = 50;
+            } else {
+              firstErrInput.focus();
+            }
+          }, 100);
+          return false;
+        }
+      });
+    }
+  }
+};
+</script>
+<style lang="less">
+.depositAmount {
+  padding: 20px;
+  .tit-con {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    position: relative;
+    .shu {
+      width: 0.28rem;
+      height: 1rem;
+      background-color: #3b6af1;
+    }
+    .tit {
+      color: #444444;
+      padding: 0 0.8rem;
+      line-height: 1rem;
+    }
+    .bg {
+      flex: 1;
+      background: url("../../images/baseInfo/tit-bg.png");
+      height: 1rem;
+      background-size: 100% 100%;
+    }
+    .del-family-icon {
+      position: absolute;
+      right: 0;
+      top: 0.5rem;
+      height: 1.5rem;
+      cursor: pointer;
+    }
+  }
+  .form-item-con {
+    margin: 2rem 0;
+    position: relative;
+    .el-form-item {
+      width: 35%;
+      float: left;
+      height: 2.5rem;
+      .el-form-item__label {
+        font-size: 0.9rem;
+      }
+      .el-input {
+        width: 80%;
+        .read-idCard {
+          color: #3b6af1;
+          background: #f0f8ff;
+          font-size: 0.75rem;
+          cursor: pointer;
+        }
+        .read-idCard:active {
+          opacity: 0.6;
+        }
+      }
+      .el-select {
+        width: 80%;
+        .el-input {
+          width: 100%;
+        }
+      }
+    }
+    .upload-con {
+      width: 30%;
+      position: absolute;
+      top: 50%;
+      right: 0;
+      transform: translateY(-50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      .el-form-item__content {
+        margin-left: 0 !important;
+      }
+      .img-con {
+        max-width: 100%;
+        border: 1px solid #e4edf6;
+        border-bottom: 0;
+        padding: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 10rem;
+        height: 15rem;
+        cursor: pointer;
+        img {
+          max-width: 100%;
+          max-height: 100%;
+        }
+      }
+
+      .upload-btn {
+        width: 100%;
+        padding: 0.3rem 0;
+        background: #e4edf6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #3b6af1;
+        font-size: 0.9rem;
+        cursor: pointer;
+      }
+      .upload-btn:hover {
+        opacity: 0.6;
+      }
+    }
+  }
+  .btn-con {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 5rem;
+    padding-bottom: 2rem;
+    .el-button {
+      width: 23%;
+      padding: 0.9rem;
+    }
+  }
+}
+</style>

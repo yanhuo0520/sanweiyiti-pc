@@ -1,0 +1,633 @@
+<template>
+    <div class="loan-product-list"  v-loading="loading">
+		<div class="breadcrumb-con">
+			<img class="left-icon" src="../../images/breadcrumb-left-icon.png" alt="">
+			<div class="breadcrumb-info">
+				<el-breadcrumb separator-class="el-icon-arrow-right">
+					<el-breadcrumb-item>系统配置</el-breadcrumb-item>
+					<el-breadcrumb-item  class="breadcrumb-tit">借款产品配置</el-breadcrumb-item>
+				</el-breadcrumb>
+			</div>
+			<el-button size="small" @click="initData()">刷新</el-button>
+		</div>
+		<div class="operate-con clearfix">
+			<div class="search-con">
+				<el-form class="clearfix"  label-width="65px">
+					<el-form-item label="产品名称">
+						<el-input v-model="productName" placeholder="请输入产品名称" clearable></el-input>
+					</el-form-item>
+					<el-button type="primary" size="small" :loading="loading" @click="search()">{{loading ? '获取数据中...' : '查询'}}</el-button>
+				</el-form>
+			</div>
+			<div class="btn-con" v-if="!loading">
+				<el-button slot="trigger" size="small"  type="primary" v-if="isAdd" @click="addEditProduct(1)">添加产品</el-button>
+			</div>
+		</div>
+        <div class="table-con">
+            <template v-if="data && data.length > 0">
+                <el-table :data="data" border row-key="product_id">
+                    <el-table-column type="expand" >
+                        <template slot-scope="props">
+							<div class="inner-table-tit-con">
+								<div class="inner-table-tit">【{{props.row.product_name}}】 的利率列表</div>
+								<div class="btn-con">
+									<el-button slot="trigger" size="small"  type="primary" v-if="isAdd" @click="addEditRate(props.row,props.$index,1)" :loading="props.row.addRateLoading">{{props.row.addRateLoading ? '获取借款期限...': '添加利率'}}</el-button>
+								</div>
+							</div>
+                             <el-table :data="props.row.rateLists" border class="inner-table" header-row-class-name ="inner-table-header" >
+                                 <el-table-column prop="loan_term_name" label="借款期限" align="center"></el-table-column>
+								 <el-table-column prop="loan_rate" label="借款利率" align="center"></el-table-column>
+                                 <el-table-column prop="overdue_rate" label="逾期利率" align="center"></el-table-column>
+								  <el-table-column prop="add_time" label="创建时间" align="center"></el-table-column>
+								 <el-table-column  label="操作" align="center" v-if="isDel || isEdit">
+									<template slot-scope="scope">
+										<el-button type="primary" plain size="small" v-if="isEdit" @click="addEditRate(props.row,props.$index,2,scope.row,scope.$index)" :loading="scope.row.addRateLoading">{{scope.row.addRateLoading ? '获取借款期限...': '编辑'}}</el-button>
+										<el-button type="danger" plain size="small" v-if="isDel" @click="delRate(scope.row,scope.$index,props.$index)">删除</el-button>
+									</template>
+								</el-table-column>
+                             </el-table>
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="product_id" label="ID" width="70px" align="center"></el-table-column>
+                    <el-table-column prop="product_name" label="产品名称" align="center" ></el-table-column>
+                    <el-table-column prop="loan_type_name" label="借款类型" align="center" ></el-table-column>
+                    <el-table-column prop="max_loan_money" label="最高借款额度" align="center"></el-table-column>
+                    <el-table-column prop="numer_name" label="最长借款期限" align="center"></el-table-column>
+                    <el-table-column prop="maxrate" label="最高借款利率‰" align="center"></el-table-column>
+					 <el-table-column prop="add_time" label="创建时间" align="center"></el-table-column>
+					<el-table-column  label="操作" align="center" v-if="isDel || isEdit" >
+						<template slot-scope="scope">
+							<el-button type="primary" plain size="small" v-if="isEdit" @click="addEditProduct(2,scope.row,scope.$index)">编辑</el-button>
+							<el-button type="danger" plain size="small" v-if="isDel" @click="delProduct(scope.row,scope.$index)">删除</el-button>
+						</template>
+					</el-table-column>
+                </el-table>
+            </template>
+            <template v-if="!data || data.length == 0">
+                <div class="no-data-con" >
+                    <div class="absolute-center">
+                        <div class="err-info-text ">暂无借款产品列表</div>
+                    </div>
+                </div>
+            </template>
+        </div>
+		<el-dialog :title="productType == 1 ? '添加借款产品' : '编辑借款产品'" :visible.sync="productFormDialog" :close-on-click-modal="false" class="product-dialog">
+			<el-form  ref="productForm"  :model="productForm" :rules="productRules" label-width="100px" class="product-form clearfix" >
+				<el-form-item label="产品名称:" prop="product_name">
+					<el-input v-model="productForm.product_name" placeholder="请输入产品名称"></el-input>
+				</el-form-item>
+				<el-form-item label="借款类型:" prop="loan_type_id">
+					<el-select v-model="productForm.loan_type_id" placeholder="请选择借款类型">
+						<el-option v-for="(item,index) in loanTypeOptions" :label="item.loan_type_name" :value="item.loan_type_id" :key="index"></el-option>
+					</el-select>
+				</el-form-item>
+				<el-form-item label="借款期限标识:" prop="sign">
+					<el-select v-model="productForm.sign" placeholder="请选择借款期限标识">
+						<el-option label="年" value="1"></el-option>
+						<el-option label="月" value="2"></el-option>
+						<el-option label="日" value="3"></el-option>
+					</el-select>
+				</el-form-item>
+				<el-form-item :label="'借款最大' + (productForm.sign == 1 ? '年份' : (productForm.sign == 2 ? '月份' : '天数'))+ ':'" prop="numers" >
+					<el-input v-model="productForm.numers" placeholder="请输入数字" ></el-input>
+				</el-form-item>
+				
+				<el-form-item label="最高借款额度:" prop="max_loan_money">
+					<el-input v-model="productForm.max_loan_money"  @input="handlePrice" placeholder="请输入最高借款额度" ></el-input>
+				</el-form-item>
+			</el-form>
+			<div slot="footer" class="dialog-footer">
+				<el-button @click="productFormDialog = false">取 消</el-button>
+				<el-button type="primary" @click.stop="productSubmit('productForm')" :loading="productSubmitLoading">确 定</el-button>
+			</div>
+		</el-dialog>
+
+		<el-dialog :title="rateType == 1 ? '添加产品利率' : '编辑产品利率'" :visible.sync="rateFormDialog" class="rate-dialog">
+			<el-form  ref="rateForm"  :model="rateForm" :rules="rateRules" label-width="100px" class="rate-form clearfix" >
+				<el-form-item label="借款期限:" prop="loan_term_id">
+					<el-select v-model="rateForm.loan_term_id" placeholder="请选择借款期限">
+						<el-option v-for="(item,index) in loanTermOptions" :label="item.loan_term_name" :value="item.loan_term_id" :key="index"></el-option>
+					</el-select>
+				</el-form-item>
+				<el-form-item label="借款利率:"  prop="loan_rate">
+					<el-input v-model="rateForm.loan_rate" placeholder="请输入借款利率" @input="handleLoanRate"></el-input>
+				</el-form-item>
+				<el-form-item label="借款逾期利率:" prop="overdue_rate">
+					<el-input v-model="rateForm.overdue_rate" placeholder="请输入本金逾期加罚率" @input="handleOverdueRate"></el-input>
+				</el-form-item>
+			</el-form>
+			<div slot="footer" class="dialog-footer">
+				<el-button @click="rateFormDialog = false">取 消</el-button>
+				<el-button type="primary" @click="rateSubmit('rateForm')" :loading="rateSubmitLoading">确 定</el-button>
+			</div>
+		</el-dialog>
+    </div>
+</template>
+<script>
+export default {
+  name: "loanProductList",
+  data() {
+	var checkNum = (rule, value, callback) => {
+        if (!value) {
+            return callback(new Error('请输入一个数字'));
+        }
+        let numReg = /^[0-9]*[1-9][0-9]*$/;
+        if (!numReg.test(value)) {
+        callback(new Error('请输入正确的数字'));
+        } else {
+            callback();
+        }
+    };
+	var checkPrice = (rule, value, callback) => {
+        if (!value) {
+            return callback(new Error('请输入借款金额'));
+		}
+		callback();
+	};
+	var checkLoanRate = (rule, value, callback) => {
+        if (!value) {
+            return callback(new Error('请输入利率'));
+        }
+        let loanRateReg = /^\d+$|^\d*\.\d+$/;
+        if (!loanRateReg.test(value)) {
+        callback(new Error('请输入正确的利率'));
+        } else {
+            callback();
+        }
+    };
+    return {
+	  productName: '',
+	  lastSearch: '',
+	  data: [],
+	  loading: false,
+	
+	  productType: '',
+	  productFormDialog: false, //借款产品form表单弹窗
+	  loanTypeOptions: [], // 借款列表
+	  productIndex: '', // 当前操作编辑产品列表的下标
+	  productForm: {
+		  product_name: '',
+		  numers: '',
+		  sign: '1',
+		  loan_type_id: '',
+		  max_loan_money: '',
+	  },
+	  productRules: {
+		  product_name: [
+            { required: true, message: '请输入产品名称', trigger: 'blur' }
+		  ],
+		   loan_type_id: [
+            { required: true, message: '请选择借款类型', trigger: 'change' }
+		  ],
+		   sign: [
+            { required: true, message: '请选择借款标识', trigger: 'change' }
+		  ],
+		   numers: [
+            { required: true, validator: checkNum, trigger: 'change' }
+		  ],
+		  max_loan_money: [
+            { required: true, validator: checkPrice, trigger: 'change' }
+          ],
+	  },
+	  productSubmitLoading: false,
+
+	  rateType: '',
+	  rateFormDialog: false, //借款利率form表单弹窗
+	  loanTermOptions: [], // 借款期限
+	  loanTermLists: [], // 所有借款期限列表
+	  rateForm: {
+		  product_id: '',
+		  loan_term_id: '',
+		  loan_rate: '',
+		  overdue_rate: '',
+	  },
+	  rateRules: {
+		   loan_term_id: [
+            { required: true, message: '请选择借款期限', trigger: 'change' }
+		  ],
+		   loan_rate: [
+            { required: true, validator: checkLoanRate,  trigger: 'input' }
+		  ],
+		  overdue_rate: [
+            { required: true,validator: checkLoanRate, trigger: 'input' }
+          ],
+	  },
+	  curRateParentIndex: '', // 当前操作利率父级小标
+	  curRateIndex: '', // 当前操作利率下标
+	  rateSubmitLoading: false,
+	  addRateLoading: false, // 点击添加利率按钮请求借款年限loading
+
+	  isEdit: false,// 是否有编辑权限
+      isDel: false, //是否有删除权限
+      isAdd: false, //是否有添加权限
+    };
+  },
+  activated() {
+	  this.initData()
+  },	
+  methods: {
+	//   处理借款产品 借款金额
+	  handlePrice(val) {
+		  val = this.utils.handlePrice(val)
+		  this.productForm.max_loan_money = val
+	  },
+	  // 处理借款利率
+	  handleLoanRate(val) {
+			val = this.utils.handlePrice(val)
+		    this.rateForm.loan_rate = val
+	  },
+	  // 处理逾期加罚利率
+	  handleOverdueRate(val) {
+		  val = this.utils.handlePrice(val)
+		  this.rateForm.overdue_rate = val
+	  },
+	// 初始化信息
+	initData() {
+      this.productName = ''
+	  this.lastSearch = ''
+	  this.data = []
+	  this.productFormDialog = false
+	  this.rateFormDialog = false
+	  this.curRateParentIndex = ''
+	  this.curRateIndex = ''
+	  this.getLoanProductList()
+	  this.handlePermission()
+	},
+	// 查询
+	search() {
+		if(this.lastSearch == this.productName) { // 与上次输入搜索条件相同不走接口
+			this.$message.error('请勿重复查询!')
+		} else { // 与上次输入搜索条件不同
+			if(this.productName || this.idCard) { // 如果之前没有条件查询过 至少要输入一个查询条件
+				this.data = [];
+				this.getLoanProductList()
+			} else { // 未填写查询条件
+				if(this.lastSearch) {  // 如果之前有条件查询过 可走接口查询全部
+					this.data = [];
+					this.getLoanProductList()
+				} 
+			}
+		}	
+	},
+	// 判断当前页面都有什么权限
+	handlePermission() { 
+		let that = this;
+		that.utils.getPermissionList(that,data =>{
+			data.forEach(item =>{
+				if(item.title == '编辑') {
+					that.isEdit = true
+                }	
+                if(item.title == '删除') {
+					that.isDel = true
+                }	
+                if(item.title == '添加') {
+					that.isAdd = true
+				}	
+			})
+		})
+	},
+	// 获取产品列表
+	getLoanProductList(isAddEdit) {
+		let that = this
+		if(isAddEdit) {
+			that.loading = false;
+		} else {
+			that.loading = true;
+		}
+		that.ajax('loanProductLists',{
+			product_name: that.productName,
+		},'获取产品列表失败',res =>{
+			that.loading = false
+			if(res.errno == 0) {
+				res.data.data.forEach(item =>{
+                    item.sign = JSON.stringify(item.sign)
+                })
+				that.data = res.data.data
+				that.lastSearch = that.productName
+				that.getLoanType()
+			}
+		}, err =>{
+			that.loading = false
+		})
+	},
+	// 获取借款类型列表
+	getLoanType() {
+        let that = this;
+        that.ajax('loanType',{},'获取借款类型失败',res =>{
+			if(res.errno == 0) {
+               if(res.data && res.data.length > 0) {
+                that.productForm.loan_type_id = res.data[0].loan_type_id
+                that.loanTypeOptions =  res.data
+               }
+			}
+		})
+	  },
+	// 获取借款期限
+	getLoanTerm(product_id,sucessCallback,failCallback) {
+		let that = this;
+		that.ajax('loanTerm',{
+			product_id:product_id
+		},'获取借款年限失败',res =>{
+			if(res.errno == 0) {
+				if(res.data && res.data.length > 0){
+					that.loanTermOptions =  res.data
+					sucessCallback && typeof sucessCallback == 'function' && sucessCallback(res.data)
+				}
+			} else {
+				failCallback && typeof failCallback == 'function' && failCallback(res)
+			}
+		}, err =>{
+			failCallback && typeof failCallback == 'function' && failCallback(err)
+		})
+	},
+	// 添加编辑产品
+	addEditProduct(type,row,index) { // type 1-添加 2-编辑
+		if(type == 1) {
+			this.productForm = {
+				product_name: '',
+				numers: '',
+				sign: '1',
+				loan_type_id: this.loanTypeOptions && this.loanTypeOptions.length > 0 ? this.loanTypeOptions[0].loan_type_id : '',
+				max_loan_money: '',
+			}
+		} else {
+			this.productIndex = index
+			this.productForm = {
+				product_name: row.product_name,
+				numers: row.numers,
+				sign: row.sign,
+				loan_type_id: row.loan_type_id,
+				max_loan_money: row.max_loan_money,
+				product_id: row.product_id
+			}
+			
+		}
+		this.productType = type
+		this.productFormDialog = true
+	},
+	// 添加编辑产品提交
+	productSubmit(formName) {
+		let that = this;
+		let type = that.productType
+		console.log(1111)
+		console.log(that.productType)
+		console.log(that.$refs[formName])
+		that.$refs[formName].validate((valid) => {
+          if (valid) {
+              that.productSubmitLoading = true
+              let params = JSON.parse(JSON.stringify(that.productForm))
+              that.ajax((type == 1 ? 'loanProductAdd' : 'loanProductMod'),params,(type == 1 ? '添加' : '编辑')+ '失败',res =>{
+                that.productSubmitLoading = false
+                if(res.errno == 0) {
+					that.$message.success((type == 1 ? '添加' : '编辑')+'成功')
+					// if(type == 1) {
+					// 	let tmpData = JSON.parse(JSON.stringify(tmpData))
+						
+					// } else {
+					// 	let tmpData = JSON.parse(JSON.stringify(that.data))
+					// 	tmpData[that.productIndex] = params
+					// 	that.data = tmpData
+					// }
+					that.getLoanProductList(true)
+					that.resetForm(formName)
+					that.productFormDialog = false
+                }
+              }, err =>{
+                   that.productSubmitLoading = false
+              })
+          } else {
+            setTimeout(()=>{
+                let isError= document.getElementsByClassName("is-error");
+                let firstErrInput = isError[0].querySelector('input')
+				firstErrInput.focus();
+            },100);
+            return false;
+          }
+        });
+	},
+	//删除产品
+	delProduct(row,index) {
+		let that = this;
+		that.$confirm('此操作将永久删除该产品, 是否继续?', '提示', {
+			confirmButtonText: '确定',
+			cancelButtonText: '取消',
+			type: 'warning',
+			center: true
+			}).then(() => {
+				that.ajax('loanProductDel',{
+					product_id: row.product_id
+				},'删除失败',res =>{
+					if(res.errno == 0) {
+						that.$message.success('删除成功')
+						that.data.splice(index,1)
+						if(that.data && that.data.length == 0) {
+							that.getLoanProductList()
+						}	
+					}
+				}, err =>{
+				})
+			}).catch(() => {});
+	},
+
+	// 添加编辑利率
+	addEditRate(parentRow,parentIndex,type, row,index) { // 1-添加 2-编辑
+		let that = this;
+		if(type == 1) {
+			that.$set(parentRow, 'addRateLoading', true)
+		} else {
+			that.$set(row, 'addRateLoading', true)
+		}
+		that.getLoanTerm(parentRow.product_id, loanTermOptions =>{
+			if(type == 1) {
+				that.$set(parentRow, 'addRateLoading', false)
+			} else {
+				that.$set(row, 'addRateLoading', false)
+			}
+			if(type == 1) {
+				that.rateForm = {
+					product_id: parentRow.product_id,
+					loan_term_id: loanTermOptions[0].loan_term_id,
+					loan_rate: '',
+					overdue_rate: '',
+				}
+			} else {
+				that.rateForm = {
+					product_id: parentRow.product_id,
+					loan_term_id: row.loan_term_id,
+					loan_rate: row.loan_rate,
+					overdue_rate: row.overdue_rate,
+					rate_id: row.rate_id,
+					add_time: row.add_time
+				}
+			}
+			that.rateType = type
+			that.rateFormDialog = true
+			that.curRateParentIndex = parentIndex
+			that.curRateIndex = index
+		}, err =>{
+			if(type == 1) {
+				that.$set(parentRow, 'addRateLoading', false)
+			} else {
+				that.$set(row, 'addRateLoading', false)
+			}
+		})
+	},
+	// 添加编辑产品利率提交
+	rateSubmit(formName) {
+		let that = this;
+		let type = that.rateType
+		that.$refs[formName].validate((valid) => {
+          if (valid) {
+              that.rateSubmitLoading = true
+              let params = JSON.parse(JSON.stringify(that.rateForm))
+              that.ajax((type == 1 ? 'loanRateAdd' : 'loanRateMod'),params,(type == 1 ? '添加' : '编辑')+ '失败',res =>{
+                that.productSubmitLoading = false
+                if(res.errno == 0) {
+					that.$message.success((type == 1 ? '添加' : '编辑')+'成功')
+					// that.getLoanProductList()
+						params.loan_term_name = res.loan_term_name
+						params.add_time = that.utils.dateFormat('yyyy-MM-dd hh:mm:ss', new Date())
+					if(type == 1) {
+						params.rate_id = res.rate_id
+						that.data[that.curRateParentIndex].rateLists.push(params)
+					} else {
+						/*** 赋值不需简化  防止页面无法渲染*/ 
+						let tmpData = JSON.parse(JSON.stringify(that.data[that.curRateParentIndex].rateLists))
+						tmpData[that.curRateIndex] = params
+						that.data[that.curRateParentIndex].rateLists = tmpData
+					}
+					that.resetForm(formName)
+					that.rateFormDialog = false
+					that.rateSubmitLoading = false
+                }
+              }, err =>{
+                   that.rateSubmitLoading = false
+              })
+          } else {
+            setTimeout(()=>{
+                let isError= document.getElementsByClassName("is-error");
+                let firstErrInput = isError[0].querySelector('input')
+				firstErrInput.focus();
+            },100);
+            return false;
+          }
+        });
+	},
+	//删除利率
+	delRate(row,index,parentIndex) {
+		let that = this;
+		that.$confirm('此操作将永久删除该利率, 是否继续?', '提示', {
+			confirmButtonText: '确定',
+			cancelButtonText: '取消',
+			type: 'warning',
+			center: true
+			}).then(() => {
+				that.ajax('loanRateDel',{
+					rate_id: row.rate_id
+				},'删除失败',res =>{
+					if(res.errno == 0) {
+						that.$message.success('删除成功')
+						that.data[parentIndex].rateLists.splice(index,1)
+					}
+				}, err =>{
+				})
+			}).catch(() => {});
+	},
+	// 重置form表单
+      resetForm(formName) {
+        this.$refs[formName].resetFields();
+      }
+  }
+};
+</script>
+<style lang="less">
+.loan-product-list {
+  padding: 20px;
+  .el-pagination{
+        float: right;
+        margin-top: 30px;
+        margin-bottom: 30px;
+	}
+	.operate-con {
+	  padding: 10px 0;
+    .search-con {
+	  float: left;
+	  width: 80%;
+	  .el-form-item {
+		width: 28%;
+		float: left;
+		margin-bottom: 0;
+		.el-form-item__label {
+			font-size: 0.9rem;
+		}
+		.el-form-item__content {
+			margin-right: 30px;
+			.el-input {
+			width: 100%;
+			.read-idCard {
+				color: #3B6AF1;
+				background: #F0F8FF;
+				font-size: 0.75rem;
+				cursor: pointer;
+			}
+		}
+		}
+		
+	}
+    }
+    .btn-con {
+      float:right;
+    }
+  }
+    .table-con {
+		.inner-table-tit-con {
+			display: flex;
+			align-content: center;
+			justify-content: space-between;
+			.inner-table-tit {
+				flex: 1;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-weight: bold;
+				font-size: 1.2rem;
+				padding-bottom: 1.25rem;
+				text-align: center;
+				.btn-con {
+					display: flex;
+					align-items: center;
+					justify-content: center;
+				}
+			}
+		}	
+        
+        .inner-table {
+            thead {
+                tr th{
+                    background: #f9f9f9!important;
+                }
+            }
+        }
+	}
+	.product-dialog {
+		.product-form {
+			.el-form-item {
+				width: 45%;
+				float: left;
+			}
+		}
+	}
+	.rate-dialog {
+		.el-dialog {
+			width: 30%;
+		}
+		.rate-form {
+			.el-form-item {
+				// width: 60%;
+			}
+		}
+	}
+ 
+}
+
+</style>

@@ -1,0 +1,496 @@
+<template>
+    <div class="drawList" :class="{'admin-tmp-con': isAdmin}" v-loading="loading">
+      <template v-if="isAdmin">
+        <div class="breadcrumb-con">
+            <img class="left-icon" src="../../images/breadcrumb-left-icon.png" alt="">
+            <div class="breadcrumb-info">
+                <el-breadcrumb separator-class="el-icon-arrow-right">
+                    <el-breadcrumb-item>股金业务</el-breadcrumb-item>
+                    <el-breadcrumb-item  class="breadcrumb-tit">股金退股列表</el-breadcrumb-item>
+                </el-breadcrumb>
+            </div>
+          <el-button size="small" @click="initData()">刷新</el-button>
+        </div>
+        <div class="admin-con" v-loading="adminLoading">
+          <div class="org-menu-con">
+            <el-scrollbar wrap-class="scrollbar-wrapper">
+                <el-menu v-if="cooperativeList && cooperativeList.length > 0" class="el-menu-vertical-demo" :default-openeds="activeMenuArr" :default-active="activeMenu" @open="handleOpen" :unique-opened="true" background-color="#F8FCFF">
+                  <div v-for="(item,index) in cooperativeList" :key="index">
+                    <template v-if="item.count > 0">
+                      <el-submenu :index="index+''" :show-timeout="1000">
+                          <template slot="title">
+                            <el-tooltip class="item" :ref="'menu'+item.coopera_id" :disabled="item.disabled" @mouseenter.native="tipMouseenter(item,1)"  :content="item.coopera_name" placement="right-start">
+                              <div class="menu-title">{{item.coopera_name}}</div>
+                            </el-tooltip>
+                            <div class="admin-tag-num">{{item.count}}</div>
+                          </template>
+                          <el-menu-item v-for="(subItem,subIndex) in item.children" :index="(index+'-'+subIndex)" @click="clickMenuItem(subItem)" :key="subIndex">
+                            <template slot="title">
+                              <el-tooltip class="item" :ref="'sub-menu'+subItem.coopera_id" effect="dark" :disabled="subItem.disabled" @mouseenter.native="tipMouseenter(subItem,2)" :content="subItem.coopera_name" placement="right-start">
+                                <div class="menu-item-title level2-title">
+                                  <!-- <div class="dot"></div>
+                                  <span>{{subItem.coopera_name}}</span> -->
+                                  {{subItem.coopera_name}}
+                                </div>
+                              </el-tooltip>
+                            </template>
+                          </el-menu-item>
+                      </el-submenu>
+                    </template>
+                    <template v-else>
+                        <el-menu-item :index="index+''" @click="clickMenuItem(item)">
+                          <el-tooltip class="item" :ref="'menu'+item.coopera_id" @mouseenter.native="tipMouseenter(item,1)" :disabled="item.disabled" effect="dark" :content="item.coopera_name" placement="right-start">
+                            <div class="menu-title">{{item.coopera_name}}</div>
+                          </el-tooltip>
+                        </el-menu-item>
+                    </template>
+                  </div>
+                </el-menu>
+                <div class="no-menu-con" v-else>
+                  <div class="menu-absolute-center">
+                    <span class="text">暂无合作社信息</span>
+                  </div>
+                </div>
+            </el-scrollbar>
+          </div>
+          <div class="right-con" >
+            <el-scrollbar wrap-class="scrollbar-wrapper">
+              <div class="operate-con clearfix">
+                  <div class="search-con"  >
+                      <el-form class="clearfix"  label-width="65px">
+                          <el-form-item label="开户日期" style="width:auto"  >
+                            <el-date-picker v-model="date"  type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期"   value-format="yyyy-MM-dd"> </el-date-picker>
+                          </el-form-item>
+                          <el-button style="margin-left:15px" type="primary" size="small" :loading="loading" @click="search()">{{loading ? '获取数据中...' : '查询'}}</el-button>
+                      </el-form>
+                  </div>
+              </div>
+              <div class="info-con">
+                  <el-table :data="tableData" v-if="tableData && tableData.length > 0" border>
+                    <el-table-column prop="log_id" label="ID" width="60px" align="center"></el-table-column>
+                    <el-table-column prop="coopera_name" label="开户机构" align="center"></el-table-column>
+                    <el-table-column prop="log_date" label="退股时间" align="center"></el-table-column>
+                    <el-table-column prop="name" label="社员名称" align="center"></el-table-column>
+                    <el-table-column prop="passbook_num" label="社员账号" ></el-table-column>
+                    <!-- <el-table-column prop="term_name" label="股金种类" ></el-table-column>
+                    <el-table-column prop="term_name" label="支取分红" ></el-table-column> -->
+                    <el-table-column prop="log_money" label="退股金额" align="center"></el-table-column>
+                  </el-table>
+                  <div class="page-con">
+                    <el-pagination @current-change="handleCurPageChange" v-if="totalPage && totalPage > 0" background :current-page="curPage" layout="prev, pager, next" :total="totalPage*10"> </el-pagination>
+                  </div>
+                  <div style="height:5rem"></div>
+                  <div v-if="!tableData || tableData.length == 0">
+                    <template v-if="!tableData || tableData.length == 0">
+                      <div class="no-data-con" >
+                          <div class="absolute-center">
+                              <div class="err-info-text ">暂无股金退股列表</div>
+                          </div>
+                      </div>
+                    </template>
+                  </div>
+              </div>
+            </el-scrollbar>
+          </div>
+        </div>
+      </template>
+      <template v-else>
+          <div class="breadcrumb-con">
+            <img class="left-icon" src="../../images/breadcrumb-left-icon.png" alt="">
+            <div class="breadcrumb-info">
+                <el-breadcrumb separator-class="el-icon-arrow-right">
+                    <el-breadcrumb-item>股金业务</el-breadcrumb-item>
+                    <el-breadcrumb-item  class="breadcrumb-tit">股金退股列表</el-breadcrumb-item>
+                </el-breadcrumb>
+            </div>
+          <el-button size="small" @click="initData()">刷新</el-button>
+        </div>
+        <div class="operate-con clearfix">
+            <div class="search-con">
+                <el-form class="clearfix"  label-width="65px">
+                    <el-form-item label="合作社"  v-if="isAdmin">
+                        <el-select v-model="cooperaId" filterable placeholder="请选择合作社">
+                            <el-option v-for="(item,index) in cooperativeList" :key="index" :label="item.coopera_name" :value="item.coopera_id"></el-option>
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="开户日期" style="width:auto"  >
+                      <el-date-picker v-model="date"  type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期"   value-format="yyyy-MM-dd"> </el-date-picker>
+                    </el-form-item>
+                    <el-button type="primary" size="small" :loading="loading" @click="search()">{{loading ? '获取数据中...' : '查询'}}</el-button>
+                </el-form>
+            </div>
+        </div>
+        <div class="table-con">
+          <div>
+              <el-table :data="tableData" v-if="tableData && tableData.length > 0" border>
+                <el-table-column prop="log_id" label="ID" width="100%"></el-table-column>
+                <el-table-column prop="coopera_name" label="开户机构" ></el-table-column>
+                <el-table-column prop="log_date" label="退股时间" ></el-table-column>
+                <el-table-column prop="name" label="社员名称" ></el-table-column>
+                <el-table-column prop="passbook_num" label="社员账号" ></el-table-column>
+                <!-- <el-table-column prop="term_name" label="股金种类" ></el-table-column>
+                <el-table-column prop="term_name" label="支取分红" ></el-table-column> -->
+                <el-table-column prop="log_money" label="退股金额" ></el-table-column>
+              </el-table>
+
+              <el-pagination
+              background
+              :current-page="curPage"
+              layout="prev, pager, next"
+              :total="totalPage*10"
+              @current-change="handleCurPageChange">
+              </el-pagination>
+          </div>
+          <div v-if="!tableData || tableData.length == 0">
+              <div class="no-data-con" >
+                  <div class="absolute-center">
+                      <div class="err-info-text ">暂无信息</div>
+                  </div>
+              </div>
+          </div>
+        </div>
+      </template>
+    </div>
+</template>
+<script>
+export default {
+  name: "drawList",
+  data() {
+    return {
+      tableData: [],
+      curPage: 1,
+      totalPage: 1,
+      loading:false,
+
+      isAdmin: false, // 是否为管理员
+      adminType: '', // 管理员类型
+      cooperaId: "", //合作社id
+      cooperativeList: [],
+        date:'',
+
+      activeMenu: '0',
+      activeMenuArr: [],
+      adminLoading: false,
+      cooperationInfo: '',
+    };
+  },
+  activated() {
+    this.tableData = [];
+    this.curPage = 1;
+    this.loading = true;
+
+    // 勿删 直接赋值为0不起作用
+      this.activeMenu = '-1'
+      this.$nextTick(() =>{
+        this.activeMenu = '0'
+        this.activeMenuArr = []
+      })
+   //判断是否为管理员
+    let adminType = localStorage.getItem('is_admin')
+    if(adminType && Number(adminType) >= 1) {
+      this.isAdmin = true
+      this.adminType = adminType
+    }
+    if (this.isAdmin) {
+      this.utils.getCooperativeList(this, data =>{
+          if(data && data.length > 1 && adminType == 3) {
+              this.cooperaId = data[1].coopera_id
+          } else {
+              this.cooperaId = ''
+          }
+          data.forEach(item =>{
+              item.children = []
+              item.disabled = true
+          })
+          this.cooperativeList = data
+          this.initActive()
+          this.amountList()
+      },err =>{
+          this.loading = false
+      })
+    } else {
+      this.amountList();
+    }
+  },
+  methods: {
+    initData(){
+      this.tableData = [];
+      this.curPage = 1;
+      this.totalPage = 1;
+      this.cooperaId = '';
+      this.date = '';
+      if(this.cooperativeList && this.cooperativeList.length > 1 && this.adminType == 3) {
+          this.cooperaId = this.cooperativeList[1].coopera_id
+      } else {
+          this.cooperaId = ''
+      }
+      this.initActive()
+      this.amountList();
+    },
+    // 初始化默认合作社
+    initActive() {
+      if(this.adminType == 3) {
+         if(!this.cooperativeList || this.cooperativeList.length < 1) return
+        // this.getLevel2Data('1',() =>{
+        //     this.$nextTick(() =>{
+        //       this.activeMenu = '1-0'
+        //     })
+        // })
+        this.activeMenu = '-1'
+          this.$nextTick(() =>{
+            this.activeMenu = '1'
+          })
+      } else {
+        // 勿删 直接赋值为0不起作用
+        this.activeMenu = '-1'
+        this.$nextTick(() =>{
+          this.activeMenu = '0'
+          this.activeMenuArr = []
+        })
+      }
+    },
+    // 合作社导航展开
+    handleOpen(index) {
+      if(this.cooperativeList[index].children.length > 0) return
+      this.getLevel2Data(index)
+    },
+    // 获取子级合作社列表
+    getLevel2Data(index, callBack){
+      this.ajax(
+        "cooperativeLevelList",{ parent_id: this.cooperativeList[index].coopera_id },"获取合作社列表失败",res => {
+          if (res.errno == 0) {
+            res.data.forEach(item  =>{
+              item.disabled = true
+            })
+            this.activeMenu = index
+              this.cooperativeList[index].children = res.data
+              callBack && typeof callBack == 'function' && callBack()
+          } else {
+              this.cooperativeList[index].children = []
+          }
+        },err => {
+            this.cooperativeList[index].children = []
+        }
+      );
+    },
+    // 点击合作社获取数据
+    clickMenuItem(item) {
+      if(this.cooperaId) {
+        if(this.cooperaId == item.coopera_id) return
+      }
+      this.tableData = []
+      this.curPage = 1
+      this.totalPage = null
+      this.cooperaId = item.coopera_id
+      this.amountList()
+    },
+     // dom移动事件
+    tipMouseenter(item,type) { // type 1-一级 2-二级
+	    let isOverflow = '';
+      if(type == 1) {
+        isOverflow = this.$refs['menu'+item.coopera_id];
+      } else {
+        isOverflow = this.$refs['sub-menu'+item.coopera_id];
+      }
+      let cWidth = isOverflow[0].$el.clientWidth;
+      let sWidth = isOverflow[0].$el.scrollWidth;
+      if (sWidth > cWidth) { //超过 
+      this.$set(item, 'disabled', false);
+      } else {
+        this.$set(item, 'disabled', true);
+      }
+    },
+    // 查询
+    search() {
+      this.tableData = [];
+      this.curPage = 1;
+      this.totalPage = 1;
+      this.amountList();
+    },
+    amountList() {
+      if(this.isAdmin) {
+        this.adminLoading = true
+      } else {
+        this.loading = true
+      }
+      this.ajax(
+        "mutualfundMoneyAll",
+        {
+            page:this.curPage,
+            size:10,
+            coopera_id: this.cooperaId,
+            log_type: 10,
+            start: this.date[0],
+            end: this.date[1]
+        },
+        "查询失败",
+        res => {
+          this.loading = false
+          this.adminLoading = false
+          if (res.errno == 0) {
+            this.tableData = res.data.data;
+            this.curPage = Number(res.data.current_page);
+            this.totalPage = res.data.total;
+          }
+        },
+        err => {
+          this.loading = false
+          this.adminLoading = false
+          }
+      );
+    },
+    handleCurPageChange(val){
+        this.curPage = val;
+        this.amountList()
+    },
+  }
+};
+</script>
+<style lang="less">
+.drawList {
+  padding: 20px;
+  .el-pagination {
+    float: right;
+    margin-top: 30px;
+    margin-bottom: 30px;
+  }
+  .operate-con {
+	  padding: 10px 0;
+        .search-con {
+        float: left;
+        width: 80%;
+        .el-form-item {
+            width: 28%;
+            float: left;
+            margin-bottom: 0;
+            .el-form-item__label {
+                font-size: 0.9rem;
+            }
+            .el-form-item__content {
+                margin-right: 30px;
+                .el-input {
+                width: 100%;
+                .read-idCard {
+                    color: #3B6AF1;
+                    background: #F0F8FF;
+                    font-size: 0.75rem;
+                    cursor: pointer;
+                }
+            }
+            }
+            
+        }
+        }
+        .btn-con {
+        float:right;
+        }
+    }
+}
+.admin-tmp-con { 
+  padding: 0;
+  width: 100%; 
+  height: 100%; 
+  display: flex;
+  flex-direction: column;
+  .breadcrumb-con {
+    margin-bottom: 0;
+  }
+  .admin-con {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    .org-menu-con {
+      width: 16rem;
+      height: 100%;
+      background: #F8FCFF;
+      .level2-title {
+          color: #8F9BA7;
+      }
+      .level2-title::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 35px;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #8F9BA7;
+        transform: translateY(-50%);
+      }
+      .is-opened {
+        .el-icon-arrow-down {
+          color: #409EFF;
+        }
+        .is-active {
+          .level2-title {
+            color: #409EFF;
+          }
+          .level2-title::after {
+            background: #409EFF;
+          }
+        }
+        
+      }
+      .is-active {
+        background: #fff!important;
+      }
+      .menu-title {
+        width: 10rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .menu-item-title {
+        width: 7.5rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .no-menu-con {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        .menu-absolute-center {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%,-50%);
+          .text {
+            font-size: 0.9rem;
+            color: #999;
+
+          }
+        }
+      }
+    }
+    .right-con {
+      position: relative;
+      width: calc(100% - 16rem);
+      height: 99%;
+      padding: 10px;
+      .info-con {
+        position: relative;
+        width: 100%;
+        padding-top: 10px;
+      }
+      .operate-con {
+        padding: 0;
+      }
+      .operate-con+.el-table {
+        margin-top: 10px;
+      }
+    }
+    
+    .hide-menu {
+      width: 54px;
+    }
+    .page-con {
+      position: absolute;
+      bottom: 0;
+      right: 5rem;
+    }
+  }
+}
+</style>

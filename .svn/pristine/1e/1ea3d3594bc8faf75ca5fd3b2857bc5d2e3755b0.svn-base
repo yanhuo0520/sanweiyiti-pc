@@ -1,0 +1,981 @@
+<template>
+    <div class="index" v-loading="loading">
+		<!-- <img class="welcome-bg" src="../images/welcome-bg.png" alt=""> -->
+		<!-- 之前样式--已注释 -->
+		<!-- <div class="user-data-con">
+			<div class="data-item">
+				<div class="text">98755654</div>
+				<div class="desc">股金金额 / 元</div>
+				<img class="index-icon" src="../images/index-data-icon1.png" alt="">
+			</div>
+			<div class="data-item data-item-type2">
+				<div class="text">344845646</div>
+				<div class="desc">投放金金额 / 元</div>
+				<img class="index-icon" src="../images/index-data-icon2.png" alt="">
+			</div>
+			<div class="data-item data-item-type3">
+				<div class="text">4515415546</div>
+				<div class="desc">自然人社员人数 / 人</div>
+				<img class="index-icon" src="../images/index-data-icon3.png" alt="">
+			</div>
+			<div class="data-item data-item-type4">
+				<div class="text">1415696893</div>
+				<div class="desc">企业社员人数 / 人</div>
+				<img class="index-icon" src="../images/index-data-icon4.png" alt="">
+			</div>
+		</div> -->
+		<!-- 区域管理员/是县级管理员看的 -->
+		<div class="user-county-con" :class="{ifCoo1: adminType == 3, ifCoo2: adminType == 0}">
+			<div class="data-item" :class="{ifCoo1Item1: adminType == 3, ifCoo2Item1: adminType == 0}">
+				<div class="left">
+					<div class="text"><span>•</span>合作联社(个)</div>
+					<div class="desc">{{topNumber1}}</div>
+				</div>
+				<div><img src="../images/index_icon1.png" ></div>
+			</div>
+			<div class="data-item" :class="{ifCoo1Item2: adminType == 3, ifCoo2Item2: adminType == 0}">
+				<div class="left">
+					<div class="text"><span>•</span>合作社(个)</div>
+					<div class="desc">{{topNumber2}}</div>
+				</div>
+				<div><img src="../images/index_icon2.png" ></div>
+			</div>
+			<div class="data-item">
+				<div class="left">
+					<div class="text"><span>•</span>基础成员(个)</div>
+					<div class="desc">{{topNumber3}}</div>
+				</div>
+				<div><img src="../images/index_icon4.png" ></div>
+			</div>
+			<div class="data-item">
+				<div class="left">
+					<div class="text"><span>•</span>股金金额(元)</div>
+					<div class="desc">{{topNumber4}}</div>
+				</div>
+				<div><img src="../images/index_icon3.png" ></div>
+			</div>
+		</div>
+		<div class="pie-echart-con" :class="{ifCoo1: adminType == 3, ifCoo2: adminType == 0}">
+			<!-- 今日股金-饼状图 -->
+			<div class="pie-echart-item" ref="todayGujin" id="todayGujin"></div>
+
+			<!-- 今日投放金-饼状图 -->
+			<!-- <div class="pie-echart-item" ref="todayTouGujin" id="todayTouGujin" ></div> -->
+
+			<!-- 地图分布 -->
+			<div class="map-item" :class="{ifCoo1Map: adminType == 3, ifCoo2Map: adminType == 0}" ref="mapCont" id="mapCont"></div>
+
+			<!-- 今日社员入社人数-饼状图 -->
+			<div class="pie-echart-item" ref="todayConfrere" id="todayConfrere" ></div>
+			
+		</div>
+		<!-- <div class="bar-echart-tit-con">
+			<div class="tit-item">股金余额（合作社前5名）</div>
+			<div class="tit-item">投放金余额（合作社前5名）</div>
+		</div> -->
+		<div class="bar-echart-con" :class="{ifCoo2: adminType == 0}">
+			<!-- 股金金额-柱状图 -->
+			<div class="bar-echart-item" ref="gujinTop" id="gujinTop"></div>
+
+			<!-- 互助金金额-柱状图 -->
+			<div class="bar-echart-item" ref="touGUjinTop" id="touGUjinTop" ></div>
+		</div>
+		<el-dialog class="signDialog" title="提示" :show-close="false" :close-on-click-modal="false" :close-on-press-escape="false" :visible.sync="isSign" width="30%" center>
+			<span>请先签到</span>
+			<span slot="footer" class="dialog-footer">
+				<el-button type="primary" @click="signIn">点击签到</el-button>
+			</span>
+		</el-dialog>
+    </div>
+</template>
+<script>
+// 本地调取地图json数据
+import echarts from 'echarts'
+import linFenJson from "../../static/json/linfen_full.json"; //引入临汾json文件
+
+export default {
+  name: "index",
+  data() {
+    return {
+      loading: false,
+	  todayGujin: '',
+	  topNumber1: 10,
+	  topNumber2: 10,
+	  topNumber3: 10,
+	  topNumber4: 10,
+	  ifcooperate1: false, // 是否是合作联社，看不到合作联社的统计数据和地图
+	  ifcooperate2: false, // 是否是合作社，看不到合作联社统计数据，合作社统计数据，地图数据
+	  inNumData: [{value: 10, name: '集体经济组织'},{value: 10, name: '自然人'},{value: 10, name: '机构'}],
+	  inMoney: [{value: 155555, name: '收入'},{value: 95555, name: '支取'}],
+	  mapDataArray: [{name: '尧都区', selected: false, value: '0'},{name: '曲沃县', selected: false, value: '0'},{name: '翼城县', selected: false, value: '0'},{name: '襄汾县', selected: false, value: '0'},{name: '洪洞县', selected: false, value: '0'},{name: '古县', selected: false, value: '0'},{name: '安泽县', selected: false, value: '0'},{name: '浮山县',selected: false, value: '0'},{name: '吉县',selected: false, value: '0'},{name: '乡宁县',selected: false, value: '0'},{name: '大宁县', selected: false,value: '0'},{name: '隰县', selected: false,value: '0'},{name: '永和县', selected: false,value: '0'},{name: '蒲县', selected: false,value: '0'},{name: '汾西县',selected: false, value: '0'},{name: '侯马市',selected: false, value: '0'},{name: '霍州市',selected: false, value: '0'}],
+	  xAxisData1: [],
+	  seriesData1: [],
+	  xAxisData2: [],
+	  seriesData2: [],
+	  // 饼状图样式
+	  radius: ['20%', '35%'],
+	  center: ['50%', '65%'],
+	  
+	 // 柱状图公用样式
+	grid: {
+		left: '20',
+		right: '6%',
+		top: '110',
+		bottom: '20',
+		containLabel: true
+	},
+	yAxis: [{
+		type: 'value',
+		axisLine: {  //这是y轴文字颜色
+			show:false, //y轴线消失
+			lineStyle: {
+				color: "rgba(0,0,0,0.45)",
+			}
+		},
+		axisTick: {
+			show:false //y轴坐标点消失
+			}
+		},{
+			type: 'value',
+			name: '单位:元',
+			axisLine: {
+				show:false, //y轴线消失
+			},
+			nameTextStyle: {
+				backgroundColor: "#E6F0F9",
+				color: '#8F9BA7',
+				padding: [5,10,5,10],
+				borderRadius: 1000,
+			}
+		}],
+
+		isAdmin: false, //是否有管理权限 
+		adminType: '', // 登陆类型 0-社长 1-超级管理员 2-区域管理员 3-合作联社社长 
+		isSign: false,
+    };
+  },
+  mounted() {
+
+  },
+  activated() {
+	let that = this;
+	that.isSign = false
+	//判断是否为管理员
+	let adminType = localStorage.getItem('is_admin')
+	that.adminType = adminType
+	if(adminType && Number(adminType) >= 1) {
+		that.isAdmin = true
+	}
+	
+	let userInfo = localStorage.getItem('userInfo') ? JSON.parse(localStorage.getItem('userInfo')) : ''
+	if(!userInfo || !userInfo.job_id) return
+
+	// 判断是否有签到权限 系统默认的角色不记录签到/签退
+	let isSign = localStorage.getItem('sign')
+	if (isSign) {
+		if (Number(userInfo.post_id) > 6) {
+			that.checkSign(res => {
+				if (res.errno == 1) {
+					that.isSign =  Boolean(isSign)
+ 					eventWatch.$emit('isSign', Boolean(isSign))
+				} else if (res.errno == 0) {
+					if (!res.data.out_time) {
+						eventWatch.$emit('isSign', true)
+					}
+				}
+			})
+		}
+	}
+	setTimeout(() =>{ // 延迟加载 防止页面样式没有完全加载
+		// 今日股金
+		this.todayGujin = this.$echarts.init(document.getElementById('todayGujin'))
+		// 地图分布
+		this.mapCont = this.$echarts.init(document.getElementById('mapCont'))
+		
+		
+		// 今日投放金
+		// this.todayTouGujin = this.$echarts.init(document.getElementById('todayTouGujin'))
+		// this.getTodayTouGujinData()
+		
+		// 今日社员入社人数
+		this.todayConfrere = this.$echarts.init(document.getElementById('todayConfrere'))
+		
+
+		// 股金余额
+		this.gujinTop = this.$echarts.init(document.getElementById('gujinTop'))
+		
+
+		// 互助金余额
+		this.touGUjinTop = this.$echarts.init(document.getElementById('touGUjinTop'))
+		if(that.isAdmin && that.adminType != 3) {
+			// 统计合作联社-----判断合作联社，合作社不调取接口
+			that.ajax('cooperaCount', {coopera_level: 1}, '统计合作联社获取数据失败', res => {
+				if(res.errno == 0){
+					that.topNumber1 = res.data.data
+				}
+			})
+			// 市数据-------判断合作联社，合作社不调取接口
+			that.ajax('areaData',{}, '市数据获取数据失败', res => {
+				if(res.errno == 0){
+					let dataArray = res.data
+					for(var i = 0; i < that.mapDataArray.length; i++){
+						for(var j = 0; j < dataArray.length; j++){
+							if(dataArray[j].name == that.mapDataArray[i].name){
+								that.mapDataArray[i].value = dataArray[j].value
+								that.mapDataArray[i].selected = true
+							}
+						}
+					}
+					that.mapData()
+				}
+			})
+		}
+		if(that.isAdmin) {
+			// 统计合作社-----判断合作社身份不调取接口
+			that.ajax('cooperaCount', {coopera_level: 0}, '合作社获取数据失败', res => {
+				if(res.errno == 0){
+					that.topNumber2 = res.data.data
+				}
+			})
+			
+		// 股金余额-----判断合作社不调取接口
+			that.xAxisData1 = []
+			that.seriesData1 = []
+			that.ajax('stockSort', {type: 1}, '股金余额获取数据失败', res => {
+				if(res.errno == 0){
+					res.data.forEach(ele=>{
+						that.xAxisData1.push(ele.coopera_name)
+						that.seriesData1.push(ele.stock_money)
+					})
+
+					that.getGujinTopData()
+					
+				}
+			})
+		// 互助金金额-----判断合作社不调取接口
+			that.xAxisData2 = []
+			that.seriesData2 = []
+			that.ajax('stockSort', {type: 2}, '互助金金额获取数据失败', res => {
+				if(res.errno == 0){
+					res.data.forEach(ele=>{
+						that.xAxisData2.push(ele.coopera_name)
+						that.seriesData2.push(ele.money)
+					})
+
+					that.getTouGujinTopData()
+					
+				}
+			})
+		}
+		// 基础成员,今日入社人数
+		that.ajax('cooperaUserCount', {}, '基础成员获取数据失败', res => {
+			if(res.errno == 0){
+				that.topNumber3 = res.data.count
+				that.inNumData.forEach(ele=>{
+					if(ele.name == "集体经济组织"){
+						ele.value = res.data.jtcount
+					}else if(ele.name == "自然人"){
+						ele.value = res.data.zcount
+					}else if(ele.name == "机构"){
+						ele.value = res.data.jcount
+					}
+				})
+
+				that.getTodayConfrereData()
+			}
+		})
+	// 股金总额
+		that.ajax('stockCount', {}, '股金总额获取数据失败', res => {
+			if(res.errno == 0){
+				that.topNumber4 = res.data.data
+			}
+		})
+	// 今日股金
+		that.ajax('stockToday', {}, '今日股金获取数据失败', res => {
+			// console.log(res)
+			if(res.errno == 0){
+				that.inMoney.forEach(ele=>{
+					if(ele.name == "收入"){
+						ele.value = res.data.in
+					}else if(ele.name == "支取"){
+						ele.value = res.data.out
+					}
+				})
+
+				that.getTodayGujinData()
+			}
+		})
+	})
+  },
+  methods: {
+	// 检查是否签到
+	checkSign (callBack) {
+		this.ajax('signSearch', {}, '', res => {
+			callBack && typeof callBack == 'function' && callBack(res)
+		})
+	},
+	// 点击签到
+	signIn () {
+		this.ajax('signAdd', {
+			type: 1
+		}, '签到失败', res => {
+			if (res.errno == 0) {
+				this.isSign = false
+				this.$message.success('签到成功!')
+			}
+		})
+	},
+	//地图分布数据
+	mapData(){
+		let that = this;
+		echarts.registerMap('临汾市', linFenJson, {})//引入地图文件
+		let options = {
+			title: {
+				text: '临汾市数据',
+				top: '20',
+				left: '20',
+				textStyle: {
+				color: '#000000',
+				fontWeight: 'normal',
+			},
+			},
+			type: 'map',
+			tooltip: {
+              trigger: 'item',
+              formatter: '{b}合作联社<br/>{c} (个)'
+			},
+			// visualMap: {
+			// 	// min: 800,
+			// 	// max: 50000,
+			// 	text: ['High', 'Low'],
+			// 	left: '20',
+			// 	bottom: '10',
+			// 	realtime: false,
+			// 	calculable: true,
+			// 	inRange: {
+			// 		color: ['white', '#3B6AF1']
+			// 	}
+			// },
+			series: [
+				{
+					type: 'map',
+					mapType: '临汾市', //地图名称
+					zoom: 1.2,   //这里是关键，一定要放在 series中
+					itemStyle: {
+						normal: {
+							label: {show: true},
+							borderWidth: 1, // 省份的边框宽度
+							borderColor: '#D8D8D8', // 省份的边框颜色
+							areaColor: '#ffffff',
+						},
+					},
+					emphasis:{ 
+						label: {show: true},
+						itemStyle: {
+							areaColor: '#4C9DFF', //鼠标经过颜色
+						}
+					},
+					data: that.mapDataArray
+				},
+				
+			]
+		}
+
+		this.$nextTick(() =>{
+			this.mapCont.setOption(options)
+			window.addEventListener('resize', () => {
+				this.mapCont.resize(); 
+			});
+		})
+
+	},
+	// 今日股金
+    getTodayGujinData() {
+	  	let that = this;
+      let options = {
+        title: {
+			text: '今日股金',
+            top: '20',
+            left: '20',
+			textStyle: {
+				color: '#000000',
+				fontWeight: 'normal',
+			},
+        },
+        color: ['#73deb3','#73a0fa'],
+          tooltip: {
+              trigger: 'item',
+              formatter: '{a}(元) <br/>{b}: {c} ({d}%)'
+          },
+          legend: {
+			  icon: "circle",
+			  left: '20',
+			  top: '60',
+			  itemHeight: 10, //修改icon图形大小
+              data: ['收入', '支取']
+          },
+          series: [
+              {
+                  name: '今日股金',
+                  type: 'pie',
+				  radius: that.radius,
+				  center: that.center,
+                  label: {
+                      formatter: '{b|{b}}\n{c|{c}}  ',
+                      rich: {
+                          b: {
+                            fontSize: 12,
+                            lineHeight: 24,
+							align:'labelLine',
+							color: '#444444'
+                          },
+                          c: {
+                             align:'labelLine',
+                             color:'#444444',
+                          }
+                      }
+                  },
+                  data: that.inMoney
+              }
+          ]
+	  };
+	  this.$nextTick(() =>{
+		this.todayGujin.setOption(options)
+		window.addEventListener('resize', () => {
+			this.todayGujin.resize(); 
+		});
+	  })
+	 
+	},
+	// 今日投放金
+    getTodayTouGujinData() {
+		let that = this;
+	  	// that.ajax('', {}, '获取今日投放金数据失败', res => {
+		// 	if(res.errno == 0){
+				
+		// 	}
+		// })
+      let options = {
+        title: {
+            text: '今日投放金',
+            bottom: '0',
+            left: '50%',
+            backgroundColor: '#ABC0D7',
+            color: '#fff',
+            borderRadius: 1000,
+            textStyle: {
+              fontSize: 10,
+              color: '#fff'
+            },
+            padding:[5,8,5,8],
+            textAlign: 'center'
+        },
+        color: ['#F1D93B','#F1993B','#6AD9C5'],
+          tooltip: {
+              trigger: 'item',
+              formatter: '{a} <br/>{b}: {c} ({d}%)'
+          },
+          // legend: {
+          //     orient: 'vertical',
+          //     left: 10,
+          //     data: ['占用费收回', '投放金发放', '本金收回']
+          // },
+          series: [
+              {
+                  name: '访问来源',
+                  type: 'pie',
+                  radius: ['40%', '65%'],
+                  label: {
+                      formatter: '{b|{b}:}\n {c|{c}}  ',
+                      backgroundColor: '#E2FFFA',
+                      borderColor: '#6AD9C5',
+                      borderWidth: 0.5,
+                      borderRadius:[0, 0, 0, 10],
+					  padding: [5,10,5,15],
+                      shadowBlur:3,
+                      shadowColor: '#FFFBE3',
+                      rich: {
+                          b: {
+                            fontSize: 12,
+                            lineHeight: 20,
+							align:'labelLine',
+                          },
+                          c: {
+                             fontSize: 14,
+                             align:'labelLine',
+                             color:'#444444',
+                             fontWeight: 'bold'
+                          }
+                      }
+                  },
+                  data: [
+					  {value: 35555, name: '投放金发放'},
+					  {value: 35555, name: '本金收回'},
+                      {value: 36893, name: '占用费收回'},
+
+                  ]
+              }
+          ]
+	  };
+	  this.$nextTick(() =>{
+		this.todayTouGujin.setOption(options)
+		window.addEventListener('resize', () => {
+			this.todayTouGujin.resize(); 
+		});
+	  })
+	 
+	},
+	// 今日社员入社人数
+    getTodayConfrereData() {
+		let that = this;
+      let options = {
+        title: {
+            text: '今日社员入社人数',
+            top: '20',
+			left: '20',
+			textStyle: {
+				color: '#000000',
+				fontWeight: 'normal',
+			},
+        },
+        color: ['#87dbfc', '#a285d2', '#889ABD', ],
+          tooltip: {
+              trigger: 'item',
+              formatter: '{a}(个) <br/>{b}: {c} ({d}%)'
+          },
+          legend: {
+              icon: "circle",
+			  left: '20',
+			  top: '60',
+			  itemHeight: 10, //修改icon图形大小
+              data: ['集体经济组织', '自然人', '机构']
+          },
+          series: [
+              {
+                  name: '今日社员入社人数',
+                  type: 'pie',
+                  radius: that.radius,
+				  center: that.center,
+                  label: {
+                      formatter: '{b|{b}}\n{c|{c}}  ',
+                      rich: {
+                          b: {
+                            fontSize: 12,
+                            lineHeight: 24,
+							align:'labelLine',
+							color: '#444444'
+                          },
+                          c: {
+                             align:'labelLine',
+                             color:'#444444',
+                          }
+                      }
+                  },
+                  data: that.inNumData
+              }
+          ]
+	  };
+	  this.$nextTick(() =>{
+		  	this.todayConfrere.setOption(options)
+			window.addEventListener('resize', () => {
+				this.todayConfrere.resize(); 
+			});
+	  })
+	  
+	},
+	// 股金余额
+	getGujinTopData() {
+		let that = this;
+		
+		let options =  {
+			title: {	
+				top: '20',	
+				left: '20',			         	
+                text: '股金余额',                
+                textStyle:{					
+					color:'#000',
+					fontWeight: 'normal'
+                },
+                subtext:'合作社前五名',			
+                subtextStyle:{
+                	color:'#808080'            	
+                },				
+            },
+			color: ['#D0DDEB'],
+			tooltip: {
+				trigger: 'axis',
+			},
+			grid: that.grid,
+			xAxis: {
+				type: 'category',
+				data: that.xAxisData1,
+				// data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun' , 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+				axisLabel:{
+					interval: 0,
+					rotate:10,
+					margin: 25,
+					formatter:function(value) {    
+                        var ret = "";//拼接加\n返回的类目项  
+                        var maxLength = 10;//每项显示文字个数  
+                        var valLength = value.length;//X轴类目项的文字个数  
+                        var rowN = Math.ceil(valLength / maxLength); //类目项需要换行的行数  
+                        if (rowN > 1){//如果类目项的文字大于3,  
+                            for (var i = 0; i < rowN; i++) {  
+                                var temp = "";//每次截取的字符串  
+                                var start = i * maxLength;//开始截取的位置  
+                                var end = start + maxLength;//结束截取的位置  
+                                //这里也可以加一个是否是最后一行的判断，但是不加也没有影响，那就不加吧  
+                                temp = value.substring(start, end) + "\n";  
+                                ret += temp; //凭借最终的字符串  
+                            }  
+                            return ret;  
+                        }else{  
+                            return value;  
+                        }  
+                    } 
+				},
+				axisLine: {  //这是x轴文字颜色
+					lineStyle: {
+						color: "rgba(0,0,0,0.45)",
+					}
+				},
+				axisTick: {
+					show:false //x轴坐标点消失
+				},
+				splitLine: {show: false}
+			},
+			yAxis: that.yAxis,
+			series: [{
+				data: that.seriesData1,
+				// data: [120, 200, 150, 80, 70, 110, 130,150, 80, 70, 110, 130],
+				type: 'bar',
+				label: {
+					show: true,
+					position: "outside",
+					color: '#595959'
+				},
+				itemStyle: {
+					normal: {
+						color: new echarts.graphic.LinearGradient(0, 1, 0, 0, [{
+							offset: 0,
+							color: "#5142C0" // 0% 处的颜色
+						}, {
+							offset: 1,
+							color: "#9DDDF8" // 100% 处的颜色 
+						}], false)
+					}
+				},
+				barWidth: '60%'
+			}]
+		}
+		this.$nextTick(() =>{
+			this.gujinTop.setOption(options)
+			window.addEventListener('resize', () => {
+				this.gujinTop.resize(); 
+			});
+		})
+	  
+	},
+	// 互助金余额
+	getTouGujinTopData() {
+		let that = this;
+		let options =  {
+			title: {	
+				top: '20',	
+				left: '20',			         	
+                text: '互助金余额',                
+                textStyle:{					
+					color:'#000',
+					fontWeight: 'normal'
+                },
+                subtext:'合作社前五名',			
+                subtextStyle:{
+                	color:'#808080'            	
+                },				
+            },
+			color: ['#D1E7F6'],
+			tooltip: {
+				trigger: 'axis',
+			},
+			grid: that.grid,
+			xAxis: {
+				type: 'category',
+				data: that.xAxisData1,
+				axisLabel:{
+					interval: 0,
+					rotate:10,
+					margin: 25,
+					formatter:function(value) {    
+                        var ret = "";//拼接加\n返回的类目项  
+                        var maxLength = 10;//每项显示文字个数  
+                        var valLength = value.length;//X轴类目项的文字个数  
+                        var rowN = Math.ceil(valLength / maxLength); //类目项需要换行的行数  
+                        if (rowN > 1){//如果类目项的文字大于3,  
+                            for (var i = 0; i < rowN; i++) {  
+                                var temp = "";//每次截取的字符串  
+                                var start = i * maxLength;//开始截取的位置  
+                                var end = start + maxLength;//结束截取的位置  
+                                //这里也可以加一个是否是最后一行的判断，但是不加也没有影响，那就不加吧  
+                                temp = value.substring(start, end) + "\n";  
+                                ret += temp; //凭借最终的字符串  
+                            }  
+                            return ret;  
+                        }else{  
+                            return value;  
+                        }  
+					} 
+					
+				},
+				axisLine: {  //这是x轴文字颜色
+					lineStyle: {
+						color: "rgba(0,0,0,0.45)",
+					}
+				},
+				axisTick: {
+					show:false //x轴坐标点消失
+				},
+				splitLine: {show: false}
+			},
+			yAxis: that.yAxis,
+			series: [{
+				data: that.seriesData2,
+				type: 'bar',
+				label: {
+					show: true,
+					position: "outside",
+					color: '#595959'
+				},
+				itemStyle: {
+					normal: {
+						color: new echarts.graphic.LinearGradient(0, 1, 0, 0, [{
+							offset: 0,
+							color: "#27BAFC" // 0% 处的颜色
+						}, {
+							offset: 1,
+							color: "#ABF1DA" // 100% 处的颜色
+						}], false)
+					}
+				},
+				barWidth: '60%'
+			}]
+		}
+		this.$nextTick(() =>{
+			this.touGUjinTop.setOption(options)
+			window.addEventListener('resize', () => {
+				this.touGUjinTop.resize(); 
+			});
+		})
+	  
+	}
+  }
+};
+</script>
+<style lang="less">
+.index {
+  min-height: 75vh;
+  padding: 20px;
+  background: #F5F7FA;
+  .user-data-con {
+	  display: none !important;
+	  display: flex;
+	  align-items: center;
+	  justify-content: space-between;
+	  margin-bottom: 20px;
+	  .data-item {
+		  width: 24%;
+		  padding: 30px 20px;
+		  background: #FAF7E9;
+		  position: relative;
+		  border-radius: 8px;
+		  box-shadow: 0 0 6px #FAF7E9;
+		  .text {
+			  font-weight: bold;
+			  font-size: 1.4rem;
+			  color: #444444;
+			  padding-bottom: 10px;
+		  }
+		  .desc {
+			  color: #A79B8F;
+			  font-size: 0.9rem;
+			  padding-left: 5px;
+			  line-height: 14px;
+			  margin-left: 3px;
+			  border-left: 4px solid #A79B8F
+		  }
+		  .index-icon {
+			  position: absolute;
+			  bottom: 0;
+			  right: 0;
+			  width: 30%;
+		  }
+	  }
+	  .data-item-type2 {
+		  background: #EBF8F7;
+		  box-shadow: 0 0 6px #EBF8F7;
+		  .desc {
+			  color: #8FA7A3;
+			  border-color:#8FA7A3
+		  }
+	  }
+	  .data-item-type3 {
+		  background: #F0F8FF;
+		  box-shadow: 0 0 6px #F0F8FF;
+		  .desc {
+			  color: #8F9BA7;
+			  border-color: #8F9BA7
+		  }
+	  }
+	  .data-item-type4 {
+		  background: #FBF2F0;
+		  box-shadow: 0 0 6px #FBF2F0;
+		  .desc {
+			  color: #A78F92;
+			  border-color: #A78F92
+		  }
+	  }
+
+  }
+  .user-county-con{
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 20px;
+	.data-item{
+		color: #333333;
+		width: 24%;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 20px;
+		background: #FFFFFF;
+		box-shadow: 0 2px 11px 0 rgba(0,0,0,0.08);
+		.left{
+			span{
+				color: #5E5E5E;
+				padding-right: 10px;
+				font-size: 1.5rem;
+				line-height: 0;
+			}
+		}
+		.text{
+			font-size: 18px;
+		}
+		.desc{
+			padding-left: 20px;
+			margin-top: 10px;
+			font-size: 34px;
+		}
+		&:nth-child(1){
+			border-left: 3px solid #3382FF;
+		}
+		&:nth-child(2){
+			border-left: 3px solid #6467FF;
+		}
+		&:nth-child(3){
+			border-left: 3px solid #FFBA36;
+		}
+		&:nth-child(4){
+			border-left: 3px solid #15DBCC;
+		}
+	}
+	// 合作联社身份，看不到合作联社的统计数据和地图
+	&.ifCoo1{
+		.data-item{
+			width: 32%;
+			&.ifCoo1Item1{
+				display: none;
+			}
+		}
+		
+	}
+	// 合作社身份，看看不到合作联社统计，合作社统计，地图
+	&.ifCoo2{
+		.data-item{
+			width: 49%;
+			&.ifCoo2Item1, 
+			&.ifCoo2Item2{
+				display: none;
+			}
+		}
+		
+	}
+  }
+  .pie-echart-con {
+	margin-top: 30px;
+    display: flex;
+    align-items: center;
+	justify-content: space-between;
+	.pie-echart-item {
+		width: 25%;
+		height: 340px;
+		background: #FFFFFF;
+		box-shadow: 0 2px 11px 0 rgba(0,0,0,0.08);
+	}
+	.map-item{
+		width: 47%;
+		height: 340px;
+		background: #FFFFFF;
+		box-shadow: 0 2px 11px 0 rgba(0,0,0,0.08);
+	}
+	&.ifCoo1{
+		.pie-echart-item{
+			width: 49%;
+		}
+		.ifCoo1Map{
+			display: none;
+		}
+	}
+	&.ifCoo2{
+		.pie-echart-item{
+			width: 49%;
+		}
+		.ifCoo2Map{
+			display: none;
+		}
+	}
+  }
+  .bar-echart-tit-con {
+	  display: flex;
+	  align-items: center;
+	  justify-content: center;
+	  padding-left: 30px;
+	  padding-top: 30px;
+	  .tit-item {
+		  flex: 1;
+		  border-left: 5px solid #3B6AF1;
+		  padding-left: 15px;
+		  color: #444444;
+		  font-weight: bold;
+	  }
+  }
+  .bar-echart-con {
+	margin-top: 30px;
+    display: flex;
+    align-items: center;
+	justify-content: space-between;
+	&.ifCoo2{
+		display: none;
+	}
+	.bar-echart-item {
+		width: 49%;
+		height: 520px;
+		background: #FFFFFF;
+		box-shadow: 0 2px 11px 0 rgba(0,0,0,0.08);
+	}
+  }
+	.welcome-bg {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%,-50%);
+		height: 40vh;
+	}
+	.signDialog {
+		.el-dialog {
+			border-radius: 12px;
+			overflow: hidden;
+		}
+	}
+}
+
+</style>

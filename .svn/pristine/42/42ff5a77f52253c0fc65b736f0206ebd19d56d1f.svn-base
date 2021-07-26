@@ -1,0 +1,256 @@
+<template>
+    <div class="personal" v-loading="loading">
+      <div class="breadcrumb-con">
+        <img class="left-icon" src="../../images/breadcrumb-left-icon.png" alt="">
+        <div class="breadcrumb-info">
+          <el-breadcrumb separator-class="el-icon-arrow-right">
+            <el-breadcrumb-item>系统配置</el-breadcrumb-item>
+            <el-breadcrumb-item  class="breadcrumb-tit">账号管理</el-breadcrumb-item>
+          </el-breadcrumb>
+        </div>
+        <el-button size="small" @click="initData()">刷新</el-button>
+      </div>
+      <el-form ref="ruleForm" style="margin-top: 0.5rem" label-width="100px">
+        <div class="form-item-con clearfix">
+            <el-form-item label="用户名称:">
+                <el-input v-model="userInfo.nick_name"  readonly></el-input>
+            </el-form-item>
+            <el-form-item label="用户编号:">
+                <el-input v-model="userInfo.worker_code" readonly></el-input>
+            </el-form-item>
+            <el-form-item label="登录部门:">
+                <el-input v-model="postName" readonly></el-input>
+            </el-form-item>
+            <el-form-item label="所属机构:">
+                <el-input v-model="userInfo.coopera_name" readonly></el-input>
+            </el-form-item>
+            <el-form-item label="账号:">
+                <el-input v-model="uname" readonly></el-input>
+            </el-form-item>
+              <el-form-item label="密码:">
+                <el-input type="password" value="******" readonly>
+                  <template #append>
+                    <span class="read-idCard" @click="showEditPwd">修改密码</span>
+                  </template>
+                </el-input>
+            </el-form-item>
+        </div>
+      </el-form>
+      
+      <el-dialog title="修改密码" :visible.sync="editFormDialog" width="30%" :close-on-click-modal="false" class="edit-dialog">
+        <el-form  ref="editForm"  :model="editForm" :rules="editRules" label-width="100px" class="edit-form clearfix" >
+          <el-form-item label="手机号:" prop="phone">
+            <el-input v-model="editForm.phone" placeholder="请输入您的手机号"></el-input>
+          </el-form-item>
+          <el-form-item label="验证码:" prop="code">
+            <el-input v-model="editForm.code" placeholder="请输入您的验证码">
+               <template #append>
+                    <span class="read-idCard" @click="sendMsg">{{time ? time+ '秒' : '获取验证码'}}</span>
+                  </template>
+            </el-input>
+          </el-form-item>
+          <el-form-item label="原始密码:" prop="ypassword">
+            <el-input type="password" v-model="editForm.ypassword" show-password	 placeholder="请输入您的原始密码" ></el-input>
+          </el-form-item>
+          <el-form-item label="新密码:" prop="password">
+            <el-input type="password" v-model="editForm.password" show-password	 placeholder="请输入您的新密码" ></el-input>
+          </el-form-item>
+        </el-form>
+        <div slot="footer" class="dialog-footer">
+          <el-button @click="editFormDialog = false">取 消</el-button>
+          <el-button type="primary" @click="editSubmit('editForm')" :loading="editSubmitLoading">确 定</el-button>
+        </div>
+	  	</el-dialog>
+    </div>
+</template>
+<script>
+export default {
+  name: "personal",
+  data() {
+    return {
+      postName: '',
+      uname: '', // 账号
+      userInfo: {},
+      loading: false,
+
+      editForm: {
+        phone: '',
+        code: '',
+        ypassword: '',
+        password: '',
+      },
+      editRules: {
+         phone: [
+            { required: true, message: '请输入您的手机号', trigger: 'blur' }
+        ], 
+        code: [
+            { required: true, message: '请输入您的验证码', trigger: 'blur' }
+        ], 
+        ypassword: [
+           { required: true, message: '请输入您的原始密码', trigger: 'blur' }
+        ], 
+        password: [
+           { required: true, message: '请输入您的新密码', trigger: 'blur' }
+        ]
+      },
+
+      time: 0, // 倒计时
+      isSend: false, // 是否发送过验证码
+      timeSetInterVal: '', // 倒计时定时器
+
+      editFormDialog: false, // 修改密码弹窗
+      editSubmitLoading: false, // 密码提交loading
+
+    };
+  },
+  activated() {
+    let userInfo = localStorage.getItem('userInfo') ? JSON.parse(localStorage.getItem('userInfo')) : ''
+    if(userInfo) {
+      this.postName = userInfo.post_name
+      this.uname = localStorage.getItem('account')
+    }
+    this.initData()
+  },	
+  methods: {
+  // 初始化信息
+  initData() {
+    if(this.timeSetInterVal) {
+      clearInterval(that.timeSetInterVal)
+    }
+    this.getUserInfo()
+  },
+	// 获取个人信息
+	getUserInfo() {
+		let that = this
+		that.loading = true;
+		that.ajax('userInfoDetail',{},'获取个人信息失败',res =>{
+			that.loading = false
+			if(res.errno == 0) {
+        that.editForm.phone = res.data.data.uname
+        that.userInfo = res.data.data
+			}
+		}, err =>{
+			that.loading = false
+		})
+    },
+    // 显示修改密码dialog
+    showEditPwd() {
+      this.editForm = {
+        phone: this.uname,
+        code: '',
+        ypassword: '',
+        password: '',
+      }
+      this.editFormDialog = true
+    },
+    // 发送验证码
+    sendMsg() {
+      let that = this;
+      let reg = /^1[3456789]\d{9}$/
+      if(!reg.test(that.editForm.phone)) {
+          that.$message.error('请输入正确的手机号')
+          return
+      }
+      if(that.time) return
+      that.ajax('get_code',{
+        phone: that.editForm.phone
+      },'获取验证码失败',res =>{
+          if(res.errno == 0) {
+              that.$message.success('获取验证码成功')
+              that.time = 60
+              that.isSend = true
+              that.timeSetInterVal = setInterval(() =>{
+                that.time--
+                if(that.time <= 0) {
+                    clearInterval(that.timeSetInterVal)
+                }
+              },1000)
+          }
+      }, err =>{
+      })
+    },
+    // 修改密码提交
+    editSubmit(formName) {
+      let that = this
+      that.editForm.password = that.editForm.password.trim()
+      that.editForm.ypassword = that.editForm.ypassword.trim()
+      that.$refs[formName].validate((valid) => {
+      if (valid) {
+          let params = JSON.parse(JSON.stringify(that.editForm))
+          params.ypassword = that.utils.recursiveMD5(that.editForm.ypassword, 1)
+          params.password = that.utils.recursiveMD5(that.editForm.password, 1)
+          that.editSubmitLoading = true
+          that.ajax('psdMod',params,'修改密码失败',res =>{
+              that.editSubmitLoading = false
+              if(res.errno == 0) {
+                  that.$message.success('密码修改成功')
+                  that.editFormDialog = false
+                  that.resetForm(formName)
+              }
+          }, err =>{
+              that.editSubmitLoading = false
+          })
+      } else {
+          setTimeout(()=>{
+              let isError= document.getElementsByClassName("is-error");
+              let firstErrInput = isError[0].querySelector('input')
+                  firstErrInput.focus();
+          },100);
+          return false;
+      }
+      });
+    },
+    // 重置form表单
+    resetForm(formName) {
+      this.$refs[formName].resetFields();
+   }
+  }
+};
+</script>
+<style lang="less">
+.personal {
+  padding: 20px;
+   .form-item-con {
+        margin: 2rem 0;
+        position: relative;
+        .el-form-item {
+            width: 35%;
+            float: left;
+            .el-form-item__label {
+                font-size: 0.9rem;
+            }
+            .el-input {
+                width: 80%;
+                .read-idCard {
+                    color: #3B6AF1;
+                    background: #F0F8FF;
+                    font-size: 0.75rem;
+                    cursor: pointer;
+                }
+                .read-idCard:active {
+                    opacity: 0.6;
+                }
+            }
+        }
+        .add-btn-con {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    }
+    .edit-form {
+      width: 80%;
+       .read-idCard {
+          color: #3B6AF1;
+          background: #F0F8FF;
+          font-size: 0.75rem;
+          cursor: pointer;
+      }
+      .read-idCard:active {
+          opacity: 0.6;
+      }
+    }
+ 
+}
+
+</style>

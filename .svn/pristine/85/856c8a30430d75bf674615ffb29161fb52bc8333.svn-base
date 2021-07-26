@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<title>卡号读取</title>
+	<script type="text/javascript" src="./js/interface.js"></script>
+	<style type="text/css">
+		html { height: 100%; width: 100%; overflow-x: hidden; }
+		button { outline: none; cursor: pointer; outline: none; }
+		button:active { opacity: 0.6; }
+
+		.info { display: flex; align-items: center; justify-content: center; flex-direction: column; }
+		.info .tit { font-weight: bold; font-size: 16px; padding: 12px; width: 100%; display: flex; align-items: center; }
+		.info .tit span { flex: 1; text-align: center; }
+		.info .tit img { width: 20px; height: 20px; cursor: pointer; }
+
+		#status { padding: 20px 0; font-size: 14px; font-weight: bold; }
+		.btn-con { display: flex; align-items: center; justify-content: center; }
+		#loadBtnCon { display: none; }
+		#load { width: 120px; height: 40px; margin: 0; padding: 0; color: #fff; background-color: #3a8ee6; border: 1px solid #3a8ee6; border-radius: 1000px; cursor: pointer; }
+	</style>
+</head>
+
+<body id="bodyId">
+	<div class="info">
+		<div class="tit">
+			<span id="tit">卡号读取</span>
+			<img id="closeBtn" src="./img/iframe-close.png" alt="">
+		</div>
+		<div id="status">正在准备读卡器环境...</div>
+		<div class="btn-con" id="loadBtnCon">
+			<button id="load">重新加载</button>
+		</div>
+	</div>
+	<script>
+		var domain = '172.168.0.48'
+		function getUrlParam(name) {
+			var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)", "i");
+			var r = window.location.search.substr(1).match(reg);
+			if (r != null) return (r[2]);
+			return null;
+		}
+		//点击关闭图标按钮
+		document.getElementById("closeBtn").onclick = function () {
+			window.parent.postMessage({ type: 'close', path: getUrlParam('path') }, 'http://coopera.xfd365.com/adminer/index.html#/' + getUrlParam('path'));
+			// window.parent.postMessage({ type: 'close',path: getUrlParam('path') },'http://'+domain+':8080/#/'+getUrlParam('path'));
+		};
+		document.getElementById("load").onclick = function () {
+			window.location.reload()
+		};
+		var hasServer = false // 是否成功安装读卡器环境
+		var hasCard = false // 是否成功读取到卡号
+		var isComOpen = false // 是否成功链接读卡器
+		var icdev = -1; // 获取成功之后的参数
+		var gl_wantFunc = 0;
+		var gl_fFailedShow = 0; // 读卡是否失败
+		var obj = embed_reader.getOBJ(READER_TYPE._reader_type_contactLess);
+		obj.onResult(function (rData) {
+			switch (rData.FunctionID) {
+				case FUNCIDS._fid_adaptReader:
+					hasServer = true
+					document.querySelector('#status').innerHTML = '环境配置成功,正在连接读卡器...'
+					Connect();
+					break;
+				case FUNCIDS._fid_initialcom:
+					{
+						var opst;
+						var rel = rData.RePara_Int;
+						if (0 == rel) {
+							var hdev = parseInt(rData.RePara_Str);
+							if (hdev != -1) {
+								icdev = hdev;
+								if (isComOpen == true)
+									break;
+								isComOpen = true;             
+								gl_fFailedShow = 0; 
+								document.querySelector('#status').innerHTML = 'IC读卡器连接成功'
+								document.querySelector('#loadBtnCon').style.display = 'none'
+								//Findcard();
+								obj.config_card(icdev, 0x41);
+							}
+							else {
+								if (0 == gl_fFailedShow) {
+									gl_fFailedShow = 1;
+								}
+								document.querySelector('#status').innerHTML = 'IC读卡器连接失败'
+								isComOpen = false;          
+								document.querySelector('#loadBtnCon').style.display = 'block'
+								setInterval("Connect()", 3000);
+							}
+						}
+						else
+							document.querySelector('#status').innerHTML = 'Object load error'
+							document.querySelector('#loadBtnCon').style.display = 'block'
+					}
+					break;
+				case FUNCIDS._fid_exit:
+					document.querySelector('#status').innerHTML = 'IC读卡器连接已关闭'
+					document.querySelector('#loadBtnCon').style.display = 'block'
+					break;
+				case FUNCIDS._fid_beep:
+					Findcard();
+					break;
+				case FUNCIDS._fid_halt:
+					obj.beep(icdev, 10);
+					break;
+				case FUNCIDS._fid_findCardStr:
+					{
+						var strcard = rData.RePara_Str;
+						if (strcard && strcard != "undefined") {
+							hasCard = true;
+							document.querySelector('#status').innerHTML = '卡号读取成功'
+							window.parent.postMessage({ type: 'data', data: strcard, path: getUrlParam('path') }, 'http://coopera.xfd365.com/adminer/index.html#/' + getUrlParam('path'));
+							// window.parent.postMessage({ type: 'data',data: strcard,path: getUrlParam('path') },'http://'+domain+':8080/#/'+getUrlParam('path'));
+							obj.halt(icdev);
+						}
+						else {
+							if (0 == gl_fFailedShow) {
+								gl_fFailedShow = 1;
+								document.querySelector('#status').innerHTML = '请重新放置您的卡'
+							}
+							hasCard = false;        
+							Findcard();
+						}
+					}
+					break;
+				case FUNCIDS._fid_config_card:
+					{
+						Findcard();
+					}
+					break;
+			}
+		}
+		);
+		//链接读卡器
+		function Connect() {
+			try {
+				if (isComOpen == false)          //读卡器链接失败
+				{
+					obj.initialcom(100, 115200);
+				}
+			} catch (e) {
+				alert(e.message);
+			}
+			return;
+		}
+		// 查找卡号
+		function Findcard() {
+			obj.findcardStr(icdev, 0);
+			gl_wantFunc = 0;
+		}
+		//关闭读卡器
+		function Disconnect() {
+			iRet = obj.exit(icdev);
+			isComOpen = false; 
+		}
+	</script>
+</body>
+
+</html>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="17px" height="17px" viewBox="0 0 17 17" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 55.1 (78136) - https://sketchapp.com -->
+    <title>icon_file_default_</title>
+    <desc>Created with Sketch.</desc>
+    <g id="报告工作站" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="1--报告工作站_书写报告" transform="translate(-127.000000, -246.000000)">
+            <g id="模板" transform="translate(80.000000, 51.000000)">
+                <g id="分组" transform="translate(20.000000, 135.000000)">
+                    <g id="icon_file_default_" transform="translate(27.000000, 60.000000)">
+                        <rect id="矩形" fill="#D8D8D8" opacity="0" x="0" y="0" width="17" height="17"></rect>
+                        <path d="M16,4 L16,3 L6,3 L6,2 L6,1 L1,1 L1,4 L16,4 Z M16,5 L1,5 L1,16 L16,16 L16,5 Z M17,16 L17,17 L0,17 L0,16 L-3.85312697e-16,1 L0,0 L7,0 L7,1 L7,2 L17,2 L17,3 L17,16 Z" id="合并形状" fill="#C3C5C8"></path>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

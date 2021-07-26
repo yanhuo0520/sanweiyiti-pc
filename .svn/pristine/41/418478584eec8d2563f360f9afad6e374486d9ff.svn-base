@@ -1,0 +1,380 @@
+<template>
+    <div class="assortList" v-loading="loading">
+        <div class="breadcrumb-con">
+            <img class="left-icon" src="../../images/breadcrumb-left-icon.png" alt="">
+            <div class="breadcrumb-info">
+                <el-breadcrumb separator-class="el-icon-arrow-right">
+                    <el-breadcrumb-item>供应商城</el-breadcrumb-item>
+                    <el-breadcrumb-item class="breadcrumb-tit">商城分类列表</el-breadcrumb-item>
+                </el-breadcrumb>
+            </div>
+          <el-button size="small" @click="initData()">刷新</el-button>
+        </div>
+        <div class="operate-con clearfix">
+					<div class="search-con"  >	</div>
+          <div class="btn-con" v-if="!loading">
+              <el-button type="primary" size="small" @click="add" v-if="isAdd">添加分类</el-button>
+          </div>
+				</div>
+        <div class="table-con">
+            <div >
+              <el-table :data="tableData"  v-if="tableData && tableData.length > 0" border>
+              <el-table-column prop="assort_id" label="ID" width="70" align="center"></el-table-column>
+              <el-table-column prop="assort_name" label="分类名称" align="center"></el-table-column>
+              <el-table-column prop="assort_name" label="分类图标" align="center" >
+                  <template slot-scope="scope">
+                      <img :src="scope.row.icon" alt="">
+                  </template>
+              </el-table-column>
+              <!-- <el-table-column prop="goods_name" label="分类编码" ></el-table-column>
+              <el-table-column prop="storage" label="是否手机端展示" ></el-table-column>
+              <el-table-column prop="retail_price" label="是否手机端菜单显示" ></el-table-column> -->
+              <el-table-column prop="log_date" label="操作" v-if="isEdit || isDel" width="220" align="center">
+                  <template slot-scope="scope">
+                      <el-button type="primary" plain v-if="isEdit" size="small" @click="edit(scope.row.assort_id,scope.row.assort_name,scope.row.icon)">编辑</el-button>
+                      <el-button type="danger" plain v-if="isDel" size="small" @click="del(scope.row.assort_id)">删除</el-button>
+                  </template>
+              </el-table-column>
+              </el-table>
+
+              <el-pagination v-if="totalPage && totalPage > 0" background  :current-page="curPage"  layout="prev, pager, next" :total="totalPage*10" @current-change="handleCurPageChange">  </el-pagination>
+          </div>
+          <div v-if="!tableData || tableData.length == 0">
+              <div class="no-data-con" >
+                  <div class="absolute-center">
+                      <div class="err-info-text ">暂无信息</div>
+                  </div>
+              </div>
+          </div>
+        </div>
+
+        <el-dialog :title="title" :visible.sync="isAssort">
+          <div class="add">
+            <p>
+              商品分类:
+              <el-input v-model="assort" placeholder="请输入商品分类"></el-input>
+            </p>
+            <p>
+              商品图标:
+              <el-upload
+                  class="avatar-uploader"
+                  action="http://coopera.xfd365.com/user/auth/uploadImg"
+                  :show-file-list="false"
+                  :on-success="handlePic"
+                  :on-error="uploadErr">
+                  <img :src="icon" alt="" v-if="icon">
+                  <i v-else class="el-icon-plus avatar-uploader-icon"></i>
+              </el-upload>
+            </p>
+
+            <el-button type="primary" :loading="submitLoading" @click="submit">{{submitLoading ? '提交中...' : '确认'}}</el-button>
+          </div>
+        </el-dialog>
+    </div>
+</template>
+<script>
+export default {
+  name: "assortList",
+  data() {
+    return {
+      tableData: [],
+      curPage: 1,
+      totalPage: null,
+      loading: true,
+
+      isAssort: false,
+      title: "添加分类",
+      assort: "",
+      icon: "",
+      assort_id: "", //编辑分类时用的
+      submitLoading: false,
+
+      isEdit: false, //是否有编辑权限
+      isDel: false, //是否有删除权限
+      isAdd: false, //是否有添加权限
+    };
+  },
+  activated() {
+    this.handlePermission()
+    this.tableData = [];
+    this.curPage = 1;
+    this.loading = true;
+    this.title = "添加分类";
+    this.isAssort = false;
+    this.assort = "";
+    this.icon = "";
+    this.assort_id = "";
+    this.assortList();
+  },
+  methods: {
+    initData() {
+      this.tableData = [];
+      this.curPage = 1;
+      this.loading = true;
+      this.title = "添加分类";
+      this.isAssort = false;
+      this.assort = "";
+      this.icon = "";
+      this.assort_id = "";
+      this.assortList();
+    },
+    // 判断当前页面都有什么权限
+    handlePermission() { 
+      let that = this;
+      that.utils.getPermissionList(that,data =>{
+        data.forEach(item =>{
+          if(item.title == '编辑') {
+            that.isEdit = true
+          }	
+          if(item.title == '删除') {
+            that.isDel = true
+          }	
+          if(item.title == '添加') {
+            that.isAdd = true
+          }	
+        })
+      })
+    },
+    // 商城分类
+    assortList() {
+      this.ajax(
+        "cateList",
+        {
+          table: "assort"
+        },
+        "",
+        res => {
+            this.loading = false;
+
+          if (res.errno == 0) {
+            this.tableData = res.data;
+          }
+        },
+        err => {
+          this.loading = false;
+        }
+      );
+    },
+    handleCurPageChange(val) {
+      this.curPage = val;
+      this.assortList();
+    },
+    // 上传视频
+    handlePic(res, file) {
+      if (res.errno == 0) {
+        this.icon = res.data.url;
+        this.$forceUpdate();
+        this.$message("上传成功");
+      }
+    },
+    // 上传图片之前
+    beforeAvatarUpload(file) {
+      const fileType = file.type;
+      const fileSize = file.size / 1024 / 1024 < 10;
+      if (
+        fileType.search("jpg") < 0 &&
+        fileType.search("jpeg") < 0 &&
+        fileType.search("png") < 0 &&
+        fileType.search("JPG") < 0 &&
+        fileType.search("PNG") < 0
+      ) {
+        this.$message.error("图片类型必须是jpeg,jpg,png中的一种");
+        return false;
+      }
+    },
+    // 上传图片失败
+    uploadErr() {
+      this.$message.error("上传图片失败");
+    },
+
+    // 添加分类
+    add() {
+      this.isAssort = true;
+      this.assort = "";
+      this.icon = "";
+      this.title = "添加分类";
+      this.assort_id = "";
+    },
+    // 添加、编辑分类
+    submit() {
+      if (this.assort == "") {
+        this.$message.error("请填写分类名");
+        return;
+      }
+      if (this.icon == "") {
+        this.$message.error("请上传图标");
+        return;
+      }
+      let assort_id = "";
+      if (this.assort_id != "") {
+        assort_id = this.assort_id;
+      } else {
+        assort_id = "";
+      }
+      this.submitLoading = true;
+      this.ajax(
+        "assortAdd",
+        {
+          assort_name: this.assort,
+          parent_id:'',
+          icon: this.icon,
+          is_show: 1,
+          assort_id: assort_id
+        },
+        "失败",
+        res => {
+          this.submitLoading = false;
+          if (res.errno == 0) {
+            this.isAssort = false;
+            this.assortList();
+            if (this.assort_id != "") {
+              this.$message.success("编辑成功");
+            } else {
+              this.$message.success("添加成功");
+            }
+          } else {
+            this.$message.error(res.errmsg);
+          }
+        },
+        err => {
+          this.submitLoading = false;
+        }
+      );
+    },
+
+    // 编辑
+    edit(id, name, icon) {
+      this.isAssort = true;
+      this.title = "编辑分类";
+      this.assort_id = id;
+      this.assort = name;
+      this.icon = icon;
+    },
+
+    // 删除分类
+    del(id) {
+      this.$confirm("此操作将删除该分类, 是否继续?", "提示", {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning"
+      })
+        .then(() => {
+          this.ajax(
+            "cateDel",
+            {
+              table: "assort",
+              id: id,
+              is_show: 0
+            },
+            "删除失败",
+            res => {
+              if (res.errno == 0) {
+                this.$message.success("删除成功");
+                this.assortList()
+              }
+            },
+            err => {}
+          );
+        })
+        .catch(() => {
+          this.$message({
+            type: "info",
+            message: "已取消删除"
+          });
+        });
+    }
+  }
+};
+</script>
+<style lang="less">
+.assortList {
+  padding: 20px;
+  .operate-con {
+	  padding: 10px 0;
+    .search-con {
+	  float: left;
+	  width: 80%;
+	  .el-form-item {
+		width: 30%;
+		float: left;
+		margin-bottom: 0;
+		.el-form-item__label {
+			font-size: 0.9rem;
+		}
+		.el-form-item__content {
+			margin-right: 30px;
+			.el-input {
+			width: 100%;
+			.read-idCard {
+				color: #3B6AF1;
+				background: #F0F8FF;
+				font-size: 0.75rem;
+				cursor: pointer;
+			}
+		}
+		}
+		.el-range-editor {
+			width: 90%;
+		}
+		
+	}
+	}
+
+    .btn-con {
+      float:right;
+    }
+  }
+  .el-pagination {
+    float: right;
+    margin-top: 30px;
+    margin-bottom: 30px;
+  }
+
+  .el-table {
+    img {
+      width: 60px;
+      height: 60px;
+    }
+  }
+
+  .add {
+    p {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+      padding-left: 30%;
+      .el-input {
+        width: 40%;
+        margin-left: 10px;
+      }
+    }
+    .el-button {
+      display: block;
+      margin: 20px auto;
+    }
+    .avatar-uploader .el-upload {
+      border: 1px dashed #d9d9d9;
+      border-radius: 6px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      margin-left: 10px;
+    }
+    .avatar-uploader .el-upload:hover {
+      border-color: #409eff;
+    }
+    .avatar-uploader-icon {
+      font-size: 28px;
+      color: #8c939d;
+      width: 100px;
+      height: 100px;
+      line-height: 100px;
+      text-align: center;
+    }
+    .el-upload img {
+      width: 100px;
+      height: 100px;
+    }
+  }
+}
+</style>

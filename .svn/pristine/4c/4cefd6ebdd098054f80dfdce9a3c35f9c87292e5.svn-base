@@ -1,0 +1,324 @@
+<template>
+    <div class="mutualDepositList">
+        <div class="breadcrumb-con">
+            <img class="left-icon" src="../../images/breadcrumb-left-icon.png" alt="">
+            <div class="breadcrumb-info">
+                <el-breadcrumb separator-class="el-icon-arrow-right">
+                    <el-breadcrumb-item>股金业务</el-breadcrumb-item>
+                    <el-breadcrumb-item  class="breadcrumb-tit">股金分红</el-breadcrumb-item>
+                </el-breadcrumb>
+            </div>
+        </div>
+
+        <el-form ref="ruleForm" label-width="150px">
+            <div class="tit-con">
+                <div class="shu"></div>
+                <span class="tit">股金分红详情</span>
+                <div class="bg"></div>
+            </div>
+
+            <div class="form-item-con clearfix">
+                <el-form-item label="选择支取类型:">
+                  <el-radio-group v-model="type">
+                        <el-radio :label="item.id" v-for="(item,index) in typeOptions" :key="index">{{item.term_name}}</el-radio>
+                    </el-radio-group>
+                </el-form-item>
+                <el-form-item label="红利:">
+                    <el-input v-model="fenhong" clearable placeholder="请输入红利" @input="inputDividend"></el-input>元/股
+                </el-form-item>
+                <el-form-item label="分红金额合计:">
+                    <el-input v-model="fenhongMoney" clearable readonly></el-input>
+                </el-form-item>
+                <el-form-item label="分红日期:">
+                    <el-input v-model="date" clearable readonly></el-input>
+                </el-form-item>
+                <el-form-item label="密码:">
+                    <el-input v-model="password" clearable placeholder="请输入密码" type="password"></el-input>
+                </el-form-item>
+            </div>
+            <div class="btn-con">
+                <el-button type="primary" round @click="submitForm" :loading="submitLoading">{{submitLoading ? '提交中...' : '确定'}}</el-button>
+            </div>
+        </el-form>
+          
+    </div>
+</template>
+<script>
+export default {
+  name: "mutualDepositList",
+  data() {
+    return {
+      isAdmin: false,
+      date: "",
+
+      fenhong: "",
+      fenhongMoney: "",
+
+      typeOptions: [],
+      type: "",
+      password: "",
+      submitLoading: false
+    };
+  },
+  activated() {
+    //判断是否为管理员
+    this.isAdmin = localStorage.getItem("is_admin");
+    if (this.isAdmin == 1) {
+      this.utils.getCooperativeList(this, data => {
+        this.cooperativeList = data;
+        this.cooperaId = "";
+      });
+    }
+    this.gujin();
+    let date = new Date();
+    let dd = this.$formatDate("YYYY-mm-dd HH:MM:SS", date);
+    this.date = dd.substring(0, 10);
+  },
+  methods: {
+    //   股金类型
+    gujin() {
+      this.ajax(
+        "passbookTerm",
+        {
+          type_id: "1"
+        },
+        "获取入股期限失败",
+        res => {
+          if (res.errno == 0) {
+            this.typeOptions = res.data;
+            this.type = res.data[0].id;
+          }
+        },
+        err => {}
+      );
+    },
+    // 计算分额总计
+    inputDividend() {
+        // type 1社员分红 2合作社分红
+      let type = ''
+      if(this.isAdmin == 3){
+        type = 2
+      }else if(this.isAdmin == 0){
+        type = 1
+      }
+      this.ajax(
+        "bonusTotal",
+        {
+          dividends: this.fenhong,
+          coopera_id: "",
+          type: type
+        },
+        "计算失败",
+        res => {
+          if (res.errno == 0) {
+            this.fenhongMoney = res.data;
+          }
+        },
+        err => {}
+      );
+    },
+    // 提交
+    submitForm() {
+      if (this.fenhong == "") {
+        this.$message.error("请输入分红率");
+        return;
+      }
+      if (this.password == "") {
+        this.$message.error("请输入密码");
+        return;
+      }
+      this.submitLoading = true;
+      // param.pwd = this.utils.recursiveMD5(this.password, 1)
+      let http = ''
+      if (this.isAdmin == 3) {
+        http = 'bonusCooperative'
+        
+      } else if (this.isAdmin == 0) {
+        http = 'bonus'
+      }
+      this.ajax(
+          http,
+          {
+            bonusdate: this.date,
+            coopera_id: "",
+            pwd: this.utils.recursiveMD5(this.password, 1),
+            dividends: this.fenhong
+          },
+          "执行分红失败",
+          res => {
+            this.submitLoading = false
+            if (res.errno == 0) {
+              this.$message.success(res.errmsg);
+              this.gujin();
+              this.fenhong = "";
+              this.password = "";
+              this.fenhongMoney = "";
+              let date = new Date();
+              let dd = this.$formatDate("YYYY-mm-dd HH:MM:SS", date);
+              this.date = dd.substring(0, 10);
+            }
+          },
+          err => {this.submitLoading = false}
+        );
+    }
+  }
+};
+</script>
+<style lang="less">
+.mutualDepositList {
+  padding: 20px;
+  .el-pagination {
+    float: right;
+    margin-top: 30px;
+    margin-bottom: 30px;
+  }
+  .table-con {
+    max-height: 100px;
+    overflow-y: auto;
+  }
+  .tit-con {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    position: relative;
+    .shu {
+      width: 0.28rem;
+      height: 1rem;
+      background-color: #3b6af1;
+    }
+    .tit {
+      color: #444444;
+      padding: 0 0.8rem;
+      line-height: 1rem;
+    }
+    .bg {
+      flex: 1;
+      background: url("../../images/baseInfo/tit-bg.png");
+      height: 1rem;
+      background-size: 100% 100%;
+    }
+    .del-family-icon {
+      position: absolute;
+      right: 0;
+      top: 0.5rem;
+      height: 1.5rem;
+      cursor: pointer;
+    }
+  }
+  .form-item-con {
+    margin: 2rem 0;
+    position: relative;
+    .el-form-item {
+      width: 50%;
+      float: left;
+      .el-form-item__label {
+        font-size: 0.9rem;
+      }
+      .el-input {
+        width: 80%;
+        .read-idCard {
+          color: #3b6af1;
+          background: #f0f8ff;
+          font-size: 0.75rem;
+          cursor: pointer;
+        }
+        .read-idCard:active {
+          opacity: 0.6;
+        }
+      }
+      .el-select {
+        width: 80%;
+        .el-input {
+          width: 100%;
+        }
+      }
+    }
+    .upload-con {
+      width: 30%;
+      position: absolute;
+      top: 50%;
+      right: 0;
+      transform: translateY(-50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      .el-form-item__content {
+        margin-left: 0 !important;
+      }
+      .img-con {
+        max-width: 100%;
+        border: 1px solid #e4edf6;
+        border-bottom: 0;
+        padding: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 10rem;
+        height: 15rem;
+        cursor: pointer;
+        img {
+          max-width: 100%;
+          max-height: 100%;
+        }
+      }
+
+      .upload-btn {
+        width: 100%;
+        padding: 0.3rem 0;
+        background: #e4edf6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #3b6af1;
+        font-size: 0.9rem;
+        cursor: pointer;
+      }
+      .upload-btn:hover {
+        opacity: 0.6;
+      }
+    }
+  }
+  .operate-con {
+    padding: 10px 0;
+    .search-con {
+      float: left;
+      width: 80%;
+      .el-form-item {
+        width: 28%;
+        float: left;
+        margin-bottom: 0;
+        .el-form-item__label {
+          font-size: 0.9rem;
+        }
+        .el-form-item__content {
+          margin-right: 30px;
+          .el-input {
+            width: 100%;
+            .read-idCard {
+              color: #3b6af1;
+              background: #f0f8ff;
+              font-size: 0.75rem;
+              cursor: pointer;
+            }
+          }
+        }
+      }
+    }
+    .btn-con {
+      float: right;
+    }
+  }
+
+  .btn-con {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 5rem;
+    padding-bottom: 2rem;
+    .el-button {
+      width: 23%;
+      padding: 0.9rem;
+    }
+  }
+}
+</style>

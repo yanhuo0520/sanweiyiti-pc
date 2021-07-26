@@ -1,0 +1,325 @@
+<template>
+    <div class="contact-list">
+        <div class="contact-tit">通讯录</div>
+        <div class="contact-con">
+           <div class="nav-con">
+                <el-scrollbar wrap-class="scrollbar-wrapper" id="navScroll" >
+                    <div class="nav-item" @click="selectItem(1)">
+                        <div class="avatar">
+                            <img :src="myFriendImg" alt="">
+                        </div>
+                        <div class="tit-con">
+                            <div class="tit">我的好友</div>
+                        </div>
+                    </div>
+                    <div class="nav-item" @click="selectItem(2)">
+                        <div class="avatar">
+                            <img :src="newFriendImg" alt="">
+                        </div>
+                        <div class="tit-con">
+                            <div class="tit">新的好友</div>
+                        </div>
+                    </div>
+                    <div class="nav-item" @click="selectItem(3)">
+                        <div class="avatar">
+                            <img :src="myGroupImg" alt="">
+                        </div>
+                        <div class="tit-con">
+                            <div class="tit">我的群组</div>
+                        </div>
+                    </div>
+                </el-scrollbar>
+           </div>
+           <div class="right-con" >
+                <div class="right-tit" v-if="selectType">
+                    <div class="avatar-con">
+                        <img class="avatar" :src="selectType == 1 ? myFriendImg : (selectType == 2 ? newFriendImg : myGroupImg)" alt="">
+                        <span class="desc">{{selectType == 1 ? '我的好友' : (selectType == 2 ? '新的好友' : '我的群组')}}</span>
+                    </div>
+                    <i class="el-icon-plus" v-if="selectType == 1"></i>
+                </div> 
+                <div class="users-con" >
+                    <div class="scroll-box" v-show="selectType == 1">
+                        <el-scrollbar wrap-class="scrollbar-wrapper" id="userScroll" >
+                            <div class="user-item" v-for="(item,index) in myFriendList" :key="index">
+                                <div class="avatar-con">
+                                    <img class="avatar" :src="item.user_headimg2 ? item.user_headimg2 :defaultAvatar" alt="">
+                                </div>
+                                <div class="user-info">
+                                    <div class="info-con">
+                                        <div class="name-con">
+                                            <div class="name">{{item.user_name2}}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </el-scrollbar>
+                        <div class="no-data-con" v-if="!myFriendList || myFriendList.length == 0">
+                            <img class="no-info" src="../../images/chat/no-file.png" alt="">
+                            <span class="no-text">暂无信息</span>
+                        </div>
+                    </div>
+                    <div class="scroll-box" v-show="selectType == 2">
+                        <el-scrollbar wrap-class="scrollbar-wrapper" id="newFriendScroll" >
+                            <div class="user-item" v-for="(item,index) in newFriendList" :key="'n_'+index">
+                                <div class="avatar-con">
+                                    <img class="avatar" :src="item.user_headimg2 ? item.user_headimg2 :defaultAvatar" alt="">
+                                </div>
+                                <div class="user-info">
+                                    <div class="info-con">
+                                        <div class="name-con">
+                                            <div class="name">{{item.user_name2}}</div>
+                                        </div>
+                                        <div class="desc">{{item.desc}}</div>
+                                    </div>
+                                    <div class="btn-con">
+                                        <el-button size="mini" type="primary">接受</el-button>
+                                    </div>
+                                </div>
+                            </div>
+                        </el-scrollbar>
+                        <div class="no-data-con" v-if="!newFriendList || newFriendList.length == 0">
+                            <img class="no-info" src="../../images/chat/no-file.png" alt="">
+                            <span class="no-text">暂无信息</span>
+                        </div>
+                    </div>
+                    <div class="scroll-box" v-show="selectType == 3">
+                        <el-scrollbar wrap-class="scrollbar-wrapper" id="oldFriendScroll" >
+                            <div class="user-item" v-for="(item,index) in myGroupList" :key="'g_'+index">
+                                <div class="avatar-con">
+                                    <img class="avatar" :src="item.cluster_headimg ? item.cluster_headimg : myGroupImg" alt="">
+                                </div>
+                                <div class="user-info">
+                                    <div class="info-con">
+                                        <div class="name-con">
+                                            <div class="name">{{item.cluster_name}}</div>
+                                            <!-- <div class="tag">全员</div> -->
+                                        </div>
+                                        <div class="desc">{{item.user_lists.length}}人</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </el-scrollbar>
+                        <div class="no-data-con" v-if="!myGroupList || myGroupList.length == 0">
+                            <img class="no-info" src="../../images/chat/no-file.png" alt="">
+                            <span class="no-text">暂无信息</span>
+                        </div>
+                    </div>
+                    <div class="no-data-con" v-if="!selectType">
+                        <img class="no-info" src="../../images/chat/no-file.png" alt="">
+                        <span class="no-text">暂无信息</span>
+                    </div>
+                </div>
+           </div>
+        </div>
+        <!-- <div class="no-data-con">
+            <img class="no-info" src="../../images/chat/no-file.png" alt="">
+            <span class="no-text">暂无信息</span>
+        </div> -->
+    </div>
+</template>
+<script>
+export default {
+  name: "contactList",
+  data() {
+    return {
+        selectType: null, //1-我的好友 2-新的好友 3-群组
+        defaultAvatar: require('../../images/chat/chat-default.png'), // 默认头像
+        myFriendImg: require('../../images/chat/chat-default.png'), //我的好友图标
+        newFriendImg: require('../../images/chat/new-friend.png'), //新的好友图标
+        myGroupImg: require('../../images/chat/my-group.png'), //我的群组图标
+        myFriendList: [],
+        newFriendList: [],
+        myGroupList: []
+    };
+  },
+  activated() {
+    
+  },
+  mounted() {
+
+  },	
+  methods: {
+      selectItem(type) {
+          this.selectType = type
+          this.myFriendList = localStorage.getItem('friendList') ? JSON.parse(localStorage.getItem('friendList')) : []
+          this.myGroupList = localStorage.getItem('clusterList') ? JSON.parse(localStorage.getItem('clusterList')) : []
+      }
+  },
+};
+</script>
+<style lang="less">
+.contact-list {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    // font-family:"STHeiti";
+    overflow: hidden;
+    .contact-tit {
+        width: 100%;
+        height: 50px;
+        line-height: 50px;
+        padding-left: 20px;
+        border-bottom: 2px solid #ebebeb;
+        font-weight: bold;
+    }
+    .contact-con {
+        width: 100%;
+        height: calc(100% - 50px);
+        display: flex;
+        .nav-con {
+            width: 20%;
+            height: 100%;
+            background: #fff;
+            border-right: 1px solid #e9e9ea;
+            overflow: hidden;
+            .nav-item {
+                padding: 10px 10px;
+                border-bottom: 2px solid #fbfbfc;
+                display: flex;
+                align-items: center;
+                cursor: pointer;
+                .avatar {
+                    width: 45px;
+                    height: 45px;
+                    border-radius: 50%;
+                    img {
+                        width: 100%;
+                        height: 100%;
+                    }
+                }
+                .tit-con {
+                    padding-left: 12px;
+                    .tit {
+                        font-weight: bold;
+                        font-size: 0.95rem;
+                    }
+                }
+            }
+            .nav-item:hover {
+                background: #eeeeee!important;
+            }
+        }
+        .right-con {
+            width: 80%;
+            position: relative;
+            height: 100%;
+            .right-tit {
+                display: flex;
+                padding: 0 30px;
+                justify-content: space-between;
+                align-items: center;
+                border-bottom: 1px solid #e9e9ea;
+                height: 65px;
+                line-height: 65px;
+                .avatar-con {
+                    display: flex;
+                    align-items: center;
+                    .avatar {
+                        width: 45px;
+                        height: 45px;
+                        border-radius: 50%;
+                    }
+                    .desc {
+                        font-weight: bold;
+                        padding-left: 10px;
+                    }
+                }
+                .el-icon-plus {
+                    font-size: 20px;
+                    font-weight: bold;
+                    color: #8b9095;
+                    cursor: pointer;
+                }
+            }
+            .users-con {
+                width: 100%;
+                height: calc(100% - 65px);
+                padding-top: 10px;
+                padding-right: 10px;
+                .scroll-box {
+                    width: 100%;
+                    height: 100%;
+                    overflow: hidden;
+                }
+                .user-item {
+                    display: flex;
+                    align-items: center;
+                    padding: 0 30px;
+                    height: 60px;
+                    line-height: 60px;
+                    cursor: pointer;
+                    .avatar-con {
+                        width: 40px;
+                        height: 40px;
+                        border-radius: 50%;
+                        .avatar {
+                            width: 100%;
+                            height: 100%;
+                        }
+                    }
+                    .user-info {
+                        flex: 1;
+                        padding-left: 10px;
+                        display: flex;
+                        line-height: normal;
+                        justify-content: space-between;
+                        align-items: center;
+                        .info-con {
+                            .name-con {
+                                display: flex;
+                                align-items: center;
+                                 .name {
+                                    font-size: 0.95rem
+                                 }
+                                 .tag {
+                                     margin-left: 10px;
+                                     padding: 2px 6px;
+                                     border: 1px solid orangered;
+                                     border-radius: 1000px;
+                                     color: orangered;
+                                     font-size: 0.7rem;
+                                 }
+                            }
+                            .desc {
+                                padding-top: 5px;
+                                font-size: 0.85rem;
+                                color: #999;
+                            }
+
+                        }
+                        // .btn-con {}
+                    }
+                }
+                .user-item:hover {
+                    background: #eeeeee;
+                }
+            }
+             .no-data-con {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%,-50%);
+                width: 30%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-direction: column;
+                .no-info {
+                    width: 100%;
+                }
+                .no-text {
+                    color: #999;
+                }
+            }
+            
+
+        }
+    }
+   
+   
+}
+
+
+</style>

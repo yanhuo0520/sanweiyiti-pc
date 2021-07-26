@@ -1,0 +1,141 @@
+<template>
+    <div class="msg-list" v-loading="loading">
+        <div class="msg-list-con">
+            <div class="search-con">
+              <div class="search-input">
+                  <i class="el-icon-search" ></i>
+                  <!-- <input class="input" type="text"> -->
+                  <el-input v-model="searchVal" placeholder="请输入内容" clearable></el-input>
+              </div>
+              <div class="plus-con">
+                <i class="el-icon-plus"></i>
+              </div>
+            </div>
+            <div class="hot-key-con">
+              <div class="key-con">
+                <i class="el-icon-time"></i>
+                <i class="el-icon-time"></i>
+                <i class="el-icon-star-off"></i>
+                <i class="el-icon-collection-tag"></i>
+              </div>
+              <div class="more-icon">
+                <i class="el-icon-more"></i>
+              </div>
+            </div>
+            <div class="list-con">
+              <div class="info-item">
+                  <img class="avatar" src="../../images/chat/chat-default.png" alt="">
+                  <div class="info-con">
+                    <div class="tit-con">
+                      <div class="tit">测测</div>
+                      <div class="date">2023/02/06</div>
+                    </div>
+                    <div class="last-msg-con">
+                      <div class="last-msg">啛啛喳喳错错错错错错错错</div>
+                      
+                    </div>
+                  </div>
+              </div>
+            </div>
+        </div>
+    </div>
+</template>
+<script>
+export default {
+  name: "msgList",
+  data() {
+    return {
+      searchVal:'',
+
+      data: [],
+    };
+  },
+  activated() {
+     
+  },	
+  methods: {
+	
+  }
+};
+</script>
+<style lang="less">
+// div { box-sizing: border-box }
+.msg-list {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    .msg-list-con {
+        width: 20%;
+        height: 100%;
+        background: #fff;
+        border-right: 1px solid #eaeaeb;
+        .search-con {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          height: 40px;
+          margin: 10px;
+          .search-input {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid #eee;
+            border-radius: 1000px;
+            height: 100%;
+            padding: 5px;
+            overflow: hidden;
+            .el-icon-search {
+              padding: 0 8px; 
+              color: #9a9ea2;
+            }
+            .el-input {
+              .el-input__inner {
+                border: none;
+                padding: 0;
+              }
+            }
+          }
+          .plus-con {
+            border: 1.5px solid #f6f6f7;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px;
+            border-radius: 100px;
+            margin-left: 10px;
+            .el-icon-plus {
+              color: #72787e;
+              font-weight: bold;
+              cursor: pointer;
+            }
+          }
+        }
+
+        .hot-key-con {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 3px 10px;
+          color: #d1d4d5;
+          border: 1px solid #f6f6f7;
+          height: 40px;
+          .key-con {
+            width: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            i {
+              font-size: 1.2rem;
+              font-weight: bold;
+            }
+          }
+          i {
+            cursor: pointer;
+          }
+        }
+    }
+}
+
+</style>

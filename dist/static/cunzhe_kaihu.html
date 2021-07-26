@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title></title>
+		<style>
+			@font-face {
+			    font-family: MyFontName;
+			    src: url('font.ttf')
+			}
+			body,html{
+				font-size: 20px;
+				overflow: auto;
+				margin: 0;
+				font-family: MyFontName;
+			}
+			.main{
+				height: 280px;
+				margin-bottom: 40px;
+			}
+			.main p{
+				margin: 0;
+				height: 35px;
+			}
+			.main p span{
+				display: inline-block;
+				/* width: 80px; */
+			}
+		</style>
+	</head>
+	<body>
+		<div class="main">
+			<p>
+				<span style="margin-left: 70px;" id="name"></span>
+			</p>
+			<p>
+				<span style="margin-left: 70px;" id="card"></span>
+			</p>
+			<p>
+				<span style="margin-left: 70px;" id="kind"></span>
+			</p>
+			<p>
+				<span style="width: 250px;margin-left: 70px;" id="cunqi"></span>
+				<span id="lilv" ></span>
+			</p>
+			<p>
+				<span style="margin-left: 70px;" id="type"></span>
+			</p>
+			<p style="height: 40px;">
+				<span style="width: 250px;margin-left: 70px;" id="passbook_date"></span>
+				<span id="daoqi_date" ></span>
+			</p>
+			<p>
+				<span style="margin-left: 70px;" id="coopera_name"></span>
+			</p>
+		</div>
+		
+		<script>
+			window.onload = function(){
+				let info = JSON.parse(getUrlParam('info'))
+				// 户名
+				document.getElementById('name').innerHTML = decodeURI(info.name)
+				// 账号
+				document.getElementById('card').innerHTML = info.card
+				// 存款种类
+				// document.getElementById('kind').innerHTML = '创矫扇永'
+				// // 存期
+				// document.getElementById('cunqi').innerHTML = '1年'
+				// // 利率
+				// document.getElementById('lilv').innerHTML = '0.2%'
+				// //支取方式
+				// document.getElementById('type').innerHTML = '普喉劲'
+				//开户日
+				document.getElementById('passbook_date').innerHTML = info.passbook_date
+				// // 定期存款到期日
+				// document.getElementById('daoqi_date').innerHTML = '2021-10-14'
+				// 开户行名
+				document.getElementById('coopera_name').innerHTML = decodeURI(info.coopera_name)
+				window.print()
+			}
+			function getUrlParam(name) {
+			  var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)");
+			  let url = window.location.href.split("#")[0];
+			  let search = url.split("?")[1];
+			  if (search) {
+				var r = search.substr(0).match(reg);
+				if (r !== null) return unescape(r[2]);
+				return null;
+			  } else {
+				return null;
+			  }
+			}
+			
+			// 替换汉字
+			// function replaceDigit(x){
+			// 	x = x.replace(/0/g,'圠')
+			// 	x = x.replace(/1/g,'圡')
+			// 	x = x.replace(/2/g,'圢')
+			// 	x = x.replace(/3/g,'圤')
+			// 	x = x.replace(/4/g,'圥')
+			// 	x = x.replace(/5/g,'圦')
+			// 	x = x.replace(/6/g,'圧')
+			// 	x = x.replace(/7/g,'圩')
+			// 	x = x.replace(/8/g,'圪')
+			// 	x = x.replace(/9/g,'圫')
+			// 	x = x.replace(/-/g,'圱')
+			// 	x = x.replace('.','圵')
+			// 	x = x.replace('%','圲')
+			// 	return x
+			// }
+		</script>
+	</body>
+</html>

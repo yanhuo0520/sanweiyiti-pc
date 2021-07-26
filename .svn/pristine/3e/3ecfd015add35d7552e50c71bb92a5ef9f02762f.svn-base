@@ -1,0 +1,2085 @@
+<template>
+    <div class="msg-list">
+        <div class="msg-list-con">
+            <div class="search-con" v-if="isMsgSuccess">
+              <div class="search-input" >
+                  <i class="el-icon-search" ></i>
+                  <!-- <input class="input" type="text"> -->
+                  <el-input v-model="searchVal" placeholder="请输入内容"  @focus="searchInputFocus" @input="searchInput" @clear="searchClear" clearable></el-input>
+              </div>
+              <div class="plus-con">
+                <i class="el-icon-plus"></i>
+              </div>
+            </div>
+            <template v-if="isSearch">
+              <div class="search-data-con">
+                 <template v-if="searchVal && searchResultList.length > 0">
+                  <el-scrollbar wrap-class="scrollbar-wrapper" id="searchScroll" >
+                   <div class="search-item" v-for="(item,index) in searchResultList" :key="index">
+                    <template v-if="item.list && item.list.length > 0">
+                      <div class="tit">{{item.tit}}</div>
+                      <div class="search-item-con" v-for="(subItem,subIndex) in item.list" :key="subIndex" @click.stop="toChatBySearch(subItem)">
+                        <div class="avatar">
+                          <img :src="subItem.headimg ? subItem.headimg : (subItem.type == 1 ? defaultAvatar : defaultGroupImg)" alt="">
+                        </div>
+                        <div class="name-con">
+                          <span v-html="markedRedKeyword(subItem.name,searchVal)"></span>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                  </el-scrollbar>
+                 </template>
+                 <template v-else>
+                   <div class="request-status">{{searchVal ? '暂无搜索结果,请换个关键词试试' : '请输入关键词'}}</div>
+                 </template>
+              </div>
+            </template>
+            <template v-else>
+              <div class="hot-key-con">
+                <div class="key-con">
+                  <i class="el-icon-time"></i>
+                  <i class="el-icon-time"></i>
+                  <i class="el-icon-star-off"></i>
+                  <i class="el-icon-collection-tag"></i>
+                </div>
+                <div class="more-icon">
+                  <i class="el-icon-more"></i>
+                </div>
+              </div>
+              <div class="list-con">
+                <div class="request-status" v-if="isMsgLoading">正在加载...</div>
+                <div class="request-status" style="cursor:pointer" v-if="isMsgErr && !isMsgLoading" @click="handleMsgErr">加载失败,点击重新加载</div>
+                <template v-if="isMsgSuccess">
+                  <el-scrollbar wrap-class="scrollbar-wrapper" id="menuListScroll" ref="menuListScroll" >
+                      <template v-if="msgTopList && msgTopList.length > 0">
+                        <div class="info-item is-top-bg"   :class="{'is-select-bg': item.isSelect}"  v-for="(item,index) in msgTopList" :key="index+'_1'" >
+                            <div class="info-item-con"  @click.stop="toChat(item,index)" @contextmenu.prevent.stop="openMenu($event,item,index,1)">
+                              <div class="group-dot" v-if="item.type == 2 && item.unread > 0"></div>
+                              <img class="avatar" :src="item.headimg ? item.headimg : (item.type == 1 ? defaultAvatar : defaultGroupImg)" alt="">
+                              <div class="info-con">
+                                <div class="tit-con">
+                                  <div class="tit">{{item.name}}</div>
+                                  <!-- <div class="date">{{item.lastMsg ? item.lastMsg.msg_list_time : ''}}</div> -->
+                                  <div class="date" v-if="chatObj[item.chat_record_id].length > 0">{{chatObj[item.chat_record_id][0].msg_list_time}}</div>
+                                </div>
+                                <div class="last-msg-con" >
+                                  <div class="last-msg" >
+                                    <!-- <template v-if="item.lastMsg">
+                                      <span v-if="item.type == 2">{{item.lastMsg.userName}}</span>{{item.lastMsg.msg}}
+                                    </template> -->
+                                    <template  v-if="chatObj[item.chat_record_id].length > 0">
+                                      <span v-if="item.type == 2">{{chatObj[item.chat_record_id][0].from_user_name}}：</span>{{chatObj[item.chat_record_id][0].content}}
+                                    </template>
+                                  </div>
+                                  <div class="num" v-if="item.type == 1 && item.send_type == 1 && item.unread > 0">{{item.unread}}</div>
+                                  <img class="no-disturb"  v-if="item.send_type == 2" src="../../images/chat/no-disturb-icon.png" alt="">
+                                </div>
+                              </div>
+                              <img  class="is-top" src="../../images/chat/is-top-icon.png" alt="">
+                            </div>
+                        </div>
+                        <div class="request-status" v-if="isPageMsgLoading">正在加载...</div>
+                        <div class="request-status" style="cursor:pointer" v-if="isPageMsgErr && !isPageMsgLoading" @click="handlePageMsgErr">加载失败,点击重新加载</div>
+                      </template>
+                      <template v-if="msgNormalList && msgNormalList.length > 0">
+                        <div v-for="(item,index) in msgNormalList" :key="index+'_3'">
+                          <div class="info-item"  :class="{'is-select-bg': item.isSelect}"  v-if="item.top_type == 1" >
+                            <div class="info-item-con"   @click.stop="toChat(item,index)" @contextmenu.prevent.stop="openMenu($event,item,index,1)">
+                                <div class="group-dot" v-if="item.type == 2 && item.unread > 0"></div>
+                                <img class="avatar" :src="item.headimg ? item.headimg : (item.type == 1 ? defaultAvatar : defaultGroupImg)" alt="">
+                                <div class="info-con">
+                                  <div class="tit-con">
+                                    <div class="tit">{{item.name}}</div>
+                                    <!-- <div class="date">{{item.lastMsg ? item.lastMsg.msg_list_time : ''}}</div> -->
+                                    <div class="date" v-if="chatObj[item.chat_record_id].length > 0">{{chatObj[item.chat_record_id][0].msg_list_time}}</div>
+                                  </div>
+                                  <div class="last-msg-con" >
+                                    <div class="last-msg" >
+                                      <template  v-if="chatObj[item.chat_record_id].length > 0">
+                                        <span v-if="item.type == 2">{{chatObj[item.chat_record_id][0].from_user_name}}：</span>{{chatObj[item.chat_record_id][0].content}}
+                                      </template>
+                                    </div>
+                                    <div class="num" v-if="item.type == 1 && item.send_type == 1 && item.unread > 0">{{item.unread}}</div>
+                                    <img class="no-disturb"  v-if="item.send_type == 2" src="../../images/chat/no-disturb-icon.png" alt="">
+                                  </div>
+                                </div>
+                              </div>
+                          </div>
+                        </div>
+                      </template>
+                    </el-scrollbar>
+                    <div class="request-status" v-if="msgNormalList.length == 0 && msgTopList.length == 0">暂无消息列表</div>
+                </template>
+              </div>
+            </template>
+        </div>
+        <div class="chat-con"  @contextmenu.prevent.stop="isShowRightMenu = false">
+          <template v-if="isFirst">
+              <div class="no-chat-con">
+                <img class="no-img" src="../../images/chat/no-img.png" alt="">
+                <span class="no-text">暂无聊天</span>
+              </div>
+          </template>
+          <template v-else>
+              <div class="chat-name-con" @click.stop="isShowChatPeople = !isShowChatPeople">
+                <img class="chat-avatar" :src="selectInfo.headimg ? selectInfo.headimg : defaultAvatar" alt="">
+                <div class="chat-tit">{{selectInfo.name}}<span v-if="selectInfo.type == 2" style="font-weight:normal;margin-left:5px">({{selectInfo.userList.length}})</span></div>
+                <i v-if="!isShowChatPeople" class="arrow-icon el-icon-arrow-down"></i>
+                 <i v-else class="arrow-icon el-icon-arrow-up"></i>
+            </div>
+            <div class="chat-main">
+              <div class="chat-people" @click.stop v-if="isShowChatPeople">
+                <el-scrollbar wrap-class="scrollbar-wrapper" id="chatPeopleScroll" ref="chatPeopleScroll" >
+                  <div class="people-con clearfix">
+                      <div class="avatar-con" @click="inviteFriend(selectInfo.type)">
+                        <img class="avatar" style="cursor: pointer;" src="../../images/chat/invite-icon.png" alt="">
+                      </div>  
+                      <div class="avatar-con" v-for="(userItem,userIndex) in selectInfo.userList" :key="userIndex">
+                        <img class="avatar" :src="userItem.user_headimgs ? userItem.user_headimgs : defaultAvatar" alt="">
+                        <div class="name">{{userItem.user_names}}</div>
+                      </div>
+                  </div>
+                </el-scrollbar>
+              </div>
+				<el-scrollbar wrap-class="scrollbar-wrapper" id="chatScroll" ref="chatScroll">
+                   	<div class="main-con">
+                      	<div class="request-status" v-if="chatLoading" >正在加载...</div>
+                      	<div v-for="(item,index) in curChatList" :key="index" class="chat-item">
+                       		<div class="left-info" v-if="userId != item.from_user_id">
+								<div class="date">{{item.chat_list_time}}</div>
+								<div class="item-con">
+									<div class="left-avatar">
+										<img :src="item.headimg ? item.headimg : defaultAvatar" alt="">
+									</div>
+									<div class="right-con">
+										<div class="name-con">
+											<div class="name">{{selectInfo.name}}</div>
+											<div class="tag" v-if="item.tag">{{item.tag}}</div>
+										</div>
+										<div class="msg-con">
+											<div class="msg"  @contextmenu.prevent.stop="openMenu($event,item,index,2)">{{item.content}}</div>
+										</div>
+									</div> 
+								</div>
+							</div>
+							<div class="right-info" v-if="userId == item.from_user_id">
+								<div class="date">{{item.chat_list_time}}</div>
+								<div class="item-con">
+									<div class="left-con">
+										<div class="name-con">
+											<div class="tag" v-if="item.tag">{{item.tag}}</div>
+											<div class="name">{{userId == item.from_user_id ? item.from_user_name : item.to_user_name}}</div>
+										</div>
+										<div class="msg-con">
+											<div class="msg" @contextmenu.prevent.stop="openMenu($event,curChatItem,selectInfo,2)">{{item.content}}
+                        <!-- <div class="socket-type-con">
+                          <i class="el-icon-loading"></i>
+                        </div> -->
+                      </div>
+										</div>
+									</div>
+									<div class="right-avatar">
+										<img :src="item.headimg ? item.headimg : defaultAvatar" alt="">
+									</div>
+								</div>
+							</div>
+                     	</div>
+						<!-- <div class="msg-con">
+							<div class="msg-info">
+								
+							</div>
+							<div class="close-con">
+
+							</div>
+						</div> -->
+                   </div>
+                 </el-scrollbar>
+            </div>
+            <div class="chat-input">
+              <div class="btn-con">
+                  <div class="btn-item">
+                    <!-- <img src="../../images/chat/chat-default.png" alt=""> -->
+                    <i class="el-icon-folder-opened"></i>
+                  </div>
+                  <div class="btn-item">
+                    <!-- <img src="../../images/chat/chat-default.png" alt=""> -->
+                    <i class="el-icon-folder-opened"></i>
+                  </div>
+                  <div class="btn-item">
+                    <!-- <img src="../../images/chat/chat-default.png" alt=""> -->
+                    <i class="el-icon-folder-opened"></i>
+                  </div>
+              </div>
+              <div class="input-con">
+                <el-form @submit.native.prevent>
+                  <el-input type="textarea" :rows="4" placeholder="请输入消息" resize="false" v-model="sendVal"   @keyup.enter.native="textareaKeyup($event)"></el-input>
+                </el-form>
+              </div>
+              <div class="submit-con">
+                <div class="desc">Ctrl + Enter键换行</div>
+                <div class="btn" @click="chatSubmit">
+                    <el-tooltip class="item" effect="light" content="按Enter键发送，按Ctrl+Enter键换行" placement="bottom">
+                       <span>发送</span>
+                    </el-tooltip>
+                  <div class="no-message-popover"  v-if="isSendValShow">
+                    <div class="triangle"><em></em><span></span></div>
+                    {{isSenValTip}}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+        <div class="menu-dialog" id="rightMenu" v-show="isShowRightMenu" >
+            <template v-if="isShowType == 1">
+              <div class="btn-iem" @click.stop="toSetTop" @contextmenu.prevent.stop="">{{rightClickItem.top_type == 2 ? '取消置顶' : '置顶'}}</div>
+              <div class="btn-iem" @click.stop="toSetMsg" @contextmenu.prevent.stop="">{{rightClickItem.send_type == 2 ? '开启新消息提醒' : '消息免打扰'}}</div>
+              <div class="btn-iem" @click.stop="toDelByMsgList" @contextmenu.prevent.stop="">删除聊天</div>
+            </template>
+            <template v-if="isShowType == 2">
+              <div class="btn-iem" @click.stop="" @contextmenu.prevent.stop="">复制</div>
+              <div class="btn-iem" @click.stop="" @contextmenu.prevent.stop="">删除聊天</div>
+            </template>
+        </div>
+    </div>
+</template>
+<script>
+//  from_user_id: 发送时取本地userId
+// to_user_id:  发送给谁的id
+export default {
+  name: "msgList",
+  data() {
+    return {
+      isFirst: true, //是否是第一次进入 第一次进入显示空页面,当点击聊天之后显示聊天窗口
+      isSearch: false, //搜索框是否获取了焦点
+      searchVal:'', // 搜索值
+      searchResultList: [], // 搜索结果列表
+      defaultAvatar: require('../../images/chat/chat-default.png'), 
+      defaultGroupImg: require('../../images/chat/my-group.png'), //我的群组图标
+      sendVal: '', // 发送的数据
+      msgTopList: [], //置顶数据
+      msgNormalList: [], //不置顶数据
+      friendList: [], // 好友列表
+      clusterList: [], // 群列表
+      firendAddList: [], //新的好友列表
+      clusterObj: {}, // 群成员obj
+      msgList: [], //左侧消息列表
+      selectId: '', // 当前正在聊天的id
+      chatObj: {}, // 每条消息列表的聊天记录, 以id为key, 当前消息信息为val
+      
+      // 左侧消息列表公用判断 
+      isMsgLoading: false, //左侧消息列表加载loading 
+      isMsgErr: false, //左侧接口请求消息列表加载失败  
+      isMsgSuccess: false, //左侧消息列表加载成功
+
+      // 左侧消息接口请求分级判断
+      isMsgTopListErr: false, // 获取置顶列表失败
+      isMsgNormalListErr: false, // 获取左侧消息列表失败
+      isMsgFriendListErr: false, // 获取好友列表失败
+      isMsgClusterListErr: false, // 获取群列表失败
+      isFriendAddListErr: false, //获取新的好友列表失败
+
+      //分页获取好友列表参数
+      isPageMsgLoading: false, // 分页获取好友loading
+      isPageMsgErr: false, // 分页获取好友失败
+      page: 1, // 当前分页列表页数
+      finished: false, // 当前分页列表获取完成
+
+
+      rightClickItem: '', //当前右键点击的数据
+      rightClickIndex: '', // 当前右键点击的数据index
+      isShowType: 1, //显示的自定义右侧菜单类型 1-左侧消息栏消息 2-聊天信息
+      isShowRightMenu: false, // 是否显示右侧菜单栏
+      menuDialogLeft: 0, // 自定义右键弹出框x轴距离
+      menuDialogTop: 0, // 自定义右键弹出框y轴距离
+
+      selectInfo: {}, //当前正在聊天的人或者群信息
+      selectMsgItem: '', // 当前正在聊天的 左侧消息item
+      selectMsgIndex: '', // 当前正在聊天的 左侧消息index
+      curChatList: [], // 当前正在聊天的数组
+      curChatScrollY: '', //当前正在聊天的 左侧消息item 滚动距离
+
+      isNewInfo: false, //正在聊天的时候是否提示有了新消息  (触发规则当与人正在聊天 往上滚动距离大于当前聊天框的高度)
+      chatLoading: false, //聊天记录加载loading
+
+      isSendValShow: false, // 发送消息是否显示异常状态框
+      isSenValTip: '', // 发送消息显示异常信息
+
+      socket: null,
+
+      isShowChatPeople: false, // 聊天框内点击群名或者用户名 是否显示所有用户列表
+    };
+  },
+  created() {
+    // 监听 从联系人页面中 点击好友或者群发送消息
+    eventWatch.$on('sendMsgByContactList', data =>{
+        let tmpObj = null
+        if(data.type == 1) {
+          for(let i = 0; i < this.friendList.length; i++) {
+            let item = this.friendList[i]
+            if(item.user_id2 == data.id) {
+              tmpObj = {
+                name: item.user_name2,
+                uid: item.user_id2,
+                headimg: item.user_headimg2,
+                unread: 0,
+                type: 1,
+                chat_record_id: item.chat_record_id,
+                send_type: item.send_type,
+                top_type: item.top_type,
+                userList: [{
+                  user_names: item.user_name2,
+                  user_headimgs: item.user_headimg2
+                }]
+              }
+              break;
+            }
+          }
+        }else if(data.type == 2) {
+          for(let i = 0; i < this.clusterList.length; i++) {
+            let item = this.clusterList[i]
+            if(item.cluster_id == data.id) {
+              tmpObj = {
+                name: item.cluster_name,
+                uid: item.cluster_id,
+                headimg: item.cluster_headimg,
+                unread: 0,
+                type: 2,
+                chat_record_id: item.chat_record_id,
+                send_type: item.send_type,
+                top_type: item.top_type,
+                userList: item.user_lists
+              }
+            }
+          }
+        }
+        this.toChatBySearch(tmpObj)
+    })
+    // 监听 重新连接之后是否有遗漏的好友消息
+    eventWatch.$on('chatLogin', data =>{ 
+      let that = this;
+      let msgNormalList = JSON.parse(JSON.stringify(that.msgNormalList))
+      let msgTopList = JSON.parse(JSON.stringify(that.msgTopList))
+      if(data.userRecordList && data.userRecordList.length > 0) { //是否有新消息推送
+        for(let i = 0; i < data.userRecordList.length; i++) {
+            // data.userRecordList.is//
+            data.userRecordList[i].isNew = true
+            if(data.userRecordList[i].top_type == 2) { //新消息推送是否为置顶消息
+              for(let j = 0; j < msgNormalList.length; j++) {
+                if(data.userRecordList[i].chat_record_id == msgNormalList[j].chat_record_id) { 
+                  data.userRecordList[i].isNew = false
+                  if(data.userRecordList[i].recordlists && data.userRecordList[i].recordlists.length > 0) {
+                    data.userRecordList[i].recordlists.forEach(item =>{
+                      msgNormalList[j].recordlists.push(item)
+                    })
+                    that.chatObj[msgNormalList[j].chat_record_id] = msgNormalList[j].recordlists
+                  }
+                }
+              }
+              if(data.userRecordList[i].isNew) { // 如果为新消息不存在 原来的消息列表中
+                msgNormalList.unshift(data.userRecordList[i])
+                if(data.userRecordList[i].recordlists && data.userRecordList[i].recordlists.length > 0) {
+                   that.chatObj[data.userRecordList[i].chat_record_id] = data.userRecordList[i].recordlists
+                } else {
+                  that.chatObj[data.userRecordList[i].chat_record_id] = []
+                }
+              }
+            } else if (data.userRecordList[i].top_type == 1){ //新消息推送是否为不置顶消息
+              for(let j = 0; j < msgTopList.length; j++) {
+                if(data.userRecordList[i].chat_record_id == msgTopList[j].chat_record_id) {
+                  data.userRecordList[i].isNew = false
+                  if(data.userRecordList[i].recordlists && data.userRecordList[i].recordlists.length > 0) {
+                    data.userRecordList[i].recordlists.forEach(item =>{
+                      msgTopList[j].recordlists.push(item)
+                    })
+                    that.chatObj[msgTopList[j].chat_record_id] = msgTopList[j].recordlists
+                  }
+                }
+              }
+            }
+           
+        }
+      }
+      that.msgTopList = msgTopList
+      that.msgNormalList = msgNormalList
+      that.$forceUpdate()
+    });
+    
+    let userInfo = localStorage.getItem('userInfo') ? JSON.parse(localStorage.getItem('userInfo')) : ''
+    if(userInfo) {
+      this.userId = userInfo.id
+      this.getMsgListByTop()
+
+      this.initWebsocket()
+      // this.initMsgList()
+    }
+  },
+  mounted() {
+    let that = this;
+    document.addEventListener('click', function (e) {
+        that.isShowRightMenu = false
+        that.isSearch = false
+        that.searchVal = ''
+        that.isShowChatPeople = false
+    })
+  },	
+  activated() {
+    this.finished = false
+  },
+  methods: {
+    // 初始化websocket
+    initWebsocket() {
+      this.socketType = 'loading'
+      eventWatch.$emit('socket',{type: 'openLoading'})
+      const webSocketUrl = "ws://172.168.0.81:1234";
+      // 实例化socket
+      this.socket = new WebSocket(webSocketUrl)
+      window.socket = this.socket
+      // 监听socket连接
+      this.socket.onopen = this.socketOpen
+      // 监听socket错误信息
+      this.socket.onerror = this.socketError
+      // 监听socket消息
+      this.socket.onmessage  = this.socketGetMessage
+      // 监听socket关闭
+      this.socket.onclose = this.socketClose
+      window.sendMsg = this.sendMsg
+    },
+    // 监听socket连接
+    socketOpen() {
+      console.log("socket连接成功")
+      this.socketType = 'success'
+      eventWatch.$emit('socket',{type: 'success'})
+    },
+    // 监听socket错误信息
+    socketError(e) {
+      console.log("socket出错")
+      this.socketType = 'err'
+      eventWatch.$emit('socket',{type: 'err'})
+    }, 
+    // 监听socket消息
+    socketGetMessage(e) {
+      // 接收数据
+      console.log("接收数据")
+      let that = this;
+      let data = JSON.parse(e.data);
+      console.log(data)
+
+        switch (data.msg_type) {
+          case 'handShake':
+              //首次登录，发送登录数据
+              let add_time = ''
+              let top_add_time = ''
+              let normal_add_time = ''
+              let top_add_time_text = ''
+              let normal_add_time_text = ''
+              if(that.msgNormalList && that.msgNormalList.length > 0) {
+                let tmpArr = that.msgNormalList[0].recordlists
+                if(tmpArr && tmpArr.length > 0) {
+                  top_add_time = Date.parse(tmpArr[0].add_time)/1000
+                  top_add_time_text = tmpArr[0].add_time
+                  add_time = tmpArr[0].add_time
+                }
+              }
+              if(that.msgTopList && that.msgTopList.length > 0) {
+                let tmpArr = that.msgTopList[0].recordlists
+                if(tmpArr && tmpArr.length > 0) {
+                  normal_add_time = Date.parse(tmpArr[0].add_time)/1000
+                  normal_add_time_text = tmpArr[0].add_time
+                  add_time = tmpArr[0].add_time
+                }
+              }
+
+              if(normal_add_time && top_add_time) {
+                if(normal_add_time >  top_add_time) {
+                  add_time = normal_add_time_text
+                } else {
+                  add_time = top_add_time_text
+                }
+              }
+              let userInfo = {msg_type: 'login',user_id: that.userId,add_time:add_time };
+              that.sendMsg(userInfo);
+              break;
+          case 'login':
+              // systemMessage('系统消息: ' + data.msg + '-' + data.user_id + ' 已上线');
+              // let userData = {
+              //   userId: data.user_id,
+              //   headerimg: data.headerimg,
+              //   username: data.username
+              // };
+              eventWatch.$emit('chatLogin', data);
+              break;
+          case 'logout':
+              // if (data.msg.length > 0) {
+              //     systemMessage('系统消息: ' + data.msg + '-' + data.user_id + ' 已下线');
+              // }
+              break;
+          case 'user':
+              that.handleChatList(data);
+              break;
+          case 'cluster':
+            that.handleChatList(data);
+          break;
+          case 'friendadd':
+            that.handleIsHasNewFriend(data)
+          break;
+          case 'agreeFriend':
+            that.handleIsHasNewFriend(data)
+          break;
+          case 'system':
+              // systemMessage();
+              break;
+      }
+    }, 
+  
+    // 监听socket关闭
+    socketClose(e) {
+      let userInfo = localStorage.getItem('userInfo') ? JSON.parse(localStorage.getItem('userInfo')) : ''
+      if(userInfo) {
+        this.initWebsocket()
+      }
+      console.log('websocket 断开: ' + e.code + ' ' + e.reason + ' ' + e.wasClean)
+      console.log(e)
+      this.socketType = 'close'
+      eventWatch.$emit('socket',{type: 'close'})
+    }, 
+    // 公用socket发送数据方法
+    sendMsg(msg) {
+        var data = JSON.stringify(msg);
+        this.socket.send(data);
+    },
+    // 获取 未读消息的人数
+    isDuCount() {
+      let that = this;
+      that.ajax("isDuCount",{},"",res => {
+        if(res.errno == 0) {
+          eventWatch.$emit('msgNum', res.data.count)
+        } 
+        },err => {}
+      );
+    },
+    // isMsgLoading公用loading 必须请求完最后一个左侧消息列表的接口为false 或者 在其中某个接口调用失败为false
+    // isMsgErr 公用err  必须请求完最后一个左侧消息列表的接口为fale 
+    // isMsgSuccess公用success 必须请求完最后一个左侧消息列表的接口为 true
+    // 获取置顶用户/群列表
+    getMsgListByTop() {
+      let that = this;
+      that.isMsgLoading = true
+      that.isMsgErr = true
+      that.isMsgSuccess = false
+      that.isMsgTopListErr = true
+      eventWatch.$emit('msgRequestType',{ isLoading: true, isErr: true, isSuccess: false })
+      that.ajax("userCluterList",{},"",res => {
+        if(res.errno == 0) {
+          that.isMsgTopListErr = false
+          res.data.data.forEach(item =>{
+             if(item.recordlists && item.recordlists.length > 0) {
+              item.recordlists.forEach(subItem =>{
+                subItem.msg_list_time = that.utils.handelChatTime(Date.parse(new Date(subItem.add_time)),1)
+                subItem.chat_list_time = that.utils.handelChatTime(Date.parse(new Date(subItem.add_time)),2)
+              })
+            }
+            that.chatObj[item.chat_record_id] = item.recordlists
+          })
+          that.msgTopList = res.data.data
+          that.getMsgListByNormal()
+        } else {
+          that.isMsgLoading = false
+          eventWatch.$emit('msgRequestType',{ isLoading: false, isErr: true, isSuccess: false })
+        }
+        },err => {
+          that.isMsgLoading = false
+          eventWatch.$emit('msgRequestType',{ isLoading: false, isErr: true, isSuccess: false })
+        }
+      );
+    },
+    // 获取聊天记录列表 注:前端把置顶数据隐藏掉
+    getMsgListByNormal() {
+      let that = this;
+      that.isMsgNormalListErr = true
+      that.ajax("userRecordList",{},"",res => {
+        if(res.errno == 0) {
+          that.isMsgNormalListErr = false
+          res.data.data.forEach(item =>{
+             if(item.recordlists && item.recordlists.length > 0) {
+              item.recordlists.forEach(subItem =>{
+                subItem.msg_list_time = that.utils.handelChatTime(Date.parse(new Date(subItem.add_time)),1)
+                subItem.chat_list_time = that.utils.handelChatTime(Date.parse(new Date(subItem.add_time)),2)
+              })
+            }
+            that.chatObj[item.chat_record_id] = item.recordlists
+          })
+          that.msgNormalList = res.data.data
+          if (res.data.total <= 1) {
+            that.finished = true
+          } else {
+            that.finished = false
+          }
+          that.getFriendList()
+        } else {
+          eventWatch.$emit('msgRequestType',{ isLoading: false, isErr: true, isSuccess: false })
+          that.isMsgLoading = false
+        }
+        },err => {
+          eventWatch.$emit('msgRequestType',{ isLoading: false, isErr: true, isSuccess: false })
+          that.isMsgLoading = false
+        }
+      );
+    },
+    // 获取好友列表
+    getFriendList() {
+      let that = this;
+      that.isMsgFriendListErr = true
+      that.ajax("friendLists",{},"",res => {
+        if(res.errno == 0) {
+          that.isMsgFriendListErr = false
+          that.friendList = res.data.data
+          localStorage.setItem('friendList', JSON.stringify(that.friendList))
+          that.getClusterList()
+        } else {
+          eventWatch.$emit('msgRequestType',{ isLoading: false, isErr: true, isSuccess: false })
+          that.isMsgLoading = false
+        }
+        },err => {
+          eventWatch.$emit('msgRequestType',{ isLoading: false, isErr: true, isSuccess: false })
+          that.isMsgLoading = false
+        }
+      );
+    },
+     // 获取群列表
+    getClusterList() {
+      let that = this;
+      that.isMsgClusterListErr = true
+      that.ajax("clusterLists",{},"",res => {
+          if(res.errno == 0) {
+            // that.isMsgLoading = false
+            that.isMsgClusterListErr = false
+            // that.isMsgErr = false
+            that.clusterList = res.data.data
+            let tmpClusterObj = {}
+            res.data.data.forEach(item =>{
+              tmpClusterObj[item.cluster_id] = item.user_lists
+            })
+            that.clusterObj = tmpClusterObj
+            localStorage.setItem('clusterList', JSON.stringify(that.clusterList))
+            that.getFirendAddList()
+          } else {
+            eventWatch.$emit('msgRequestType',{ isLoading: false, isErr: true, isSuccess: false })
+            that.isMsgLoading = false
+          }
+        },err => {
+          eventWatch.$emit('msgRequestType',{ isLoading: false, isErr: true, isSuccess: false })
+          that.isMsgLoading = false
+        }
+      );
+    },
+    // 获取新的好友列表
+    getFirendAddList() {
+      let that = this;
+      that.isFriendAddListErr = true
+      that.ajax("firendAddList",{},"",res => {
+        if(res.errno == 0) {
+          that.isMsgLoading = false
+          that.isFriendAddListErr = false
+          that.isMsgErr = false
+          that.firendAddList = res.data.data
+          localStorage.setItem('firendAddList', JSON.stringify(that.firendAddList))
+          that.isMsgSuccess = true
+          // setTimeout(() =>{
+          //   that.$nextTick(() =>{
+          //     that.menuListScrollEvent()
+          //   })
+          // },1000)
+          eventWatch.$emit('msgRequestType',{ isLoading: false, isErr: false, isSuccess: true })
+          let addNum = 0
+          that.firendAddList.forEach(item =>{
+            if(item.type == 1) {
+              addNum+=1
+            }
+          })
+          eventWatch.$emit('newFriendNum', addNum)
+        } else {
+          eventWatch.$emit('msgRequestType',{ isLoading: false, isErr: true, isSuccess: false })
+          that.isMsgLoading = false
+        }
+        },err => {
+          eventWatch.$emit('msgRequestType',{ isLoading: false, isErr: true, isSuccess: false })
+          that.isMsgLoading = false
+        }
+      );
+    },
+    // 左侧消息列表内接口请求失败处理
+    handleMsgErr() { 
+      this.isMsgLoading = true
+      this.isMsgErr = true
+      this.isMsgSuccess = false
+      if(this.isMsgTopListErr) {
+        this.getMsgListByTop()
+      }else if(this.isMsgNormalListErr) {
+        this.getMsgListByNormal()
+      }else if(this.isMsgFriendListErr) {
+        this.getFriendList()
+      }else if(this.isMsgClusterListErr) {
+        this.getClusterList()
+      }else if(this.isFriendAddListErr) {
+        this.getFirendAddList()
+      }
+    },
+    // 分页获取聊天记录列表 注:前端把置顶数据隐藏掉 (为快捷开发不影响逻辑,此方法暂未合并到第一次请求方法内)
+    getPageMsgListByNormal() {
+       // 消息列表暂不考虑分页 原因:如果新消息大于10条 第二页数据可能为空第三页数据无法获取....
+      let that = this;
+      let page = this.page + 1
+      if(that.finished || that.isPageMsgLoading) return
+      that.isPageMsgLoading = true
+      that.isPageMsgErr = true
+      that.ajax("userRecordList",{
+        page: that.page,
+        size: 10
+      },"",res => {
+        if(res.errno == 0) {
+          that.isPageMsgErr = false
+          that.isPageMsgLoading = false
+          if(that.page >= res.data.total) return
+          res.data.data.forEach(item =>{
+             if(item.recordlists && item.recordlists.length > 0) {
+              item.recordlists.forEach(subItem =>{
+                subItem.msg_list_time = that.utils.handelChatTime(Date.parse(new Date(subItem.add_time)),1)
+                subItem.chat_list_time = that.utils.handelChatTime(Date.parse(new Date(subItem.add_time)),2)
+              })
+            }
+            that.chatObj[item.chat_record_id] = item.recordlists
+          })
+          that.msgNormalList = that.msgNormalList.concat(res.data.data)
+          that.page = page
+          if (that.page >= res.data.total) {
+            that.finished = true
+          } else {
+            that.finished = false
+          }
+          that.isDuCount()
+        } else {
+          that.isPageMsgLoading = false
+        }
+        },err => {
+          that.isPageMsgLoading = false
+        }
+      );
+    },
+    // 搜索框获取焦点
+    searchInputFocus() {
+        this.isSearch = true;
+        this.searchVal = '';
+    },
+    // 搜索框失去焦点
+    // searchInputBlur() {
+      // setTimeout(() =>{
+      //   this.searchVal = '';
+      //   this.isSearch = false;
+      // },500)
+    // },
+    // 搜索框点击清空按钮
+    searchClear() {
+      this.isSearch = false;
+      this.searchVal = '';
+    },
+    // 搜索关键字标红
+    markedRedKeyword(val, keyword) {
+      const Reg = new RegExp(keyword, 'i');
+      let res = '';
+      if (val) {
+          res = val.replace(Reg, `<span style="color: red">${keyword}</span>`);
+        return res;
+      }
+    },
+    // 搜索框输入事件
+    searchInput() {
+      let searchResultList = []
+      let searchFirendList = []
+      let searchClusterList = []
+      this.isSearch = true
+      let searchVal = this.searchVal
+      let tmpObj = {}
+      if(this.friendList && this.friendList.length > 0) {
+        this.friendList.forEach(item =>{
+          if(item.user_name2) {
+            if(item.user_name2.indexOf(searchVal) > - 1) {
+              tmpObj = {
+                name: item.user_name2,
+                uid: item.user_id2,
+                headimg: item.user_headimg2,
+                unread: 0,
+                type: 1,
+                chat_record_id: item.chat_record_id,
+                send_type: item.send_type,
+                top_type: item.top_type,
+                userList: [{
+                  user_names: item.user_name2,
+                  user_headimgs: item.user_headimg2
+                }]
+              }
+              searchFirendList.push(tmpObj)
+            }
+          }
+        })
+      }
+      if(this.clusterList && this.clusterList.length > 0) {
+        this.clusterList.forEach(item =>{
+          if(item.cluster_name) {
+            if(item.cluster_name.indexOf(searchVal) > -1) {
+              tmpObj = {
+                name: item.cluster_name,
+                uid: item.cluster_id,
+                headimg: item.cluster_headimg,
+                unread: 0,
+                type: 2,
+                chat_record_id: item.chat_record_id,
+                send_type: item.send_type,
+                top_type: item.top_type,
+                userList: item.user_lists
+              }
+              searchClusterList.push(tmpObj)
+            }
+          }
+        })
+      }
+      if(searchFirendList.length > 0 || searchClusterList.length > 0) {
+        searchResultList = [{
+          tit: '联系人',
+          list: searchFirendList
+        },{
+          tit: '群聊',
+          list: searchClusterList
+        }]
+      }
+      console.log(searchResultList)
+      this.$nextTick(() =>{
+        this.searchResultList = searchResultList
+      })
+    },
+    // 初始化消息列表
+    // initMsgList() {
+    //   let msgList = JSON.parse(JSON.stringify(this.msgList)) 
+    //   let msgTopList = []
+    //   let msgNormalList = []
+    //   msgList.forEach(item =>{
+    //     if(item.recordlists && item.recordlists.length > 0) {
+    //       item.recordlists.forEach(subItem =>{
+    //         subItem.msg_list_time = this.utils.handelChatTime(Date.parse(new Date(subItem.add_time)),1)
+    //         subItem.chat_list_time = this.utils.handelChatTime(Date.parse(new Date(subItem.add_time)),2)
+    //       })
+    //     }
+    //     if(item.top_type == 2) {
+    //       msgTopList.push(item)
+    //     } else {
+    //       msgNormalList.push(item)
+    //     }
+    //     this.chatObj[item.chat_record_id] = item.recordlists
+    //   })
+    //   this.msgTopList = msgTopList
+    //   this.msgNormalList = msgNormalList
+    // },
+    //消息列表 右键菜单
+    openMenu(e, item,index, type) { // type弹窗来源 1-消息列表 2-聊天记录消息列表 
+        let bodyH = document.body.clientHeight // 页面可见高度
+        let menuH = document.querySelector('#rightMenu').clientHeight // 导航栏左侧高度
+        let pageX = e.pageX
+        let pageY = e.pageY
+        if(pageY + menuH  > bodyH - 10) { // 当自定义右侧栏高度超出浏览器可见高度 让其在上面弹出 10作为偏差值
+            pageY = (pageY - menuH)
+        }
+        document.querySelector('#rightMenu').style.left = pageX+'px'
+        document.querySelector('#rightMenu').style.top = pageY+'px'
+        this.isShowType = type
+        this.isShowRightMenu = true
+        if(type == 1) {
+          this.rightClickItem = item
+          this.rightClickIndex = index
+        } else if (type == 2) {
+          
+        }
+      // document.querySelector('#rightMenu').style.css.left
+    },
+    // 处理是否有新添加的好友信息
+    handleIsHasNewFriend(data) {
+       let tmpObj = {}
+       let userId = this.userId
+      if(data.msg_type == 'agreeFriend') { // 点击同意好友
+        if(userId == data.user_id) {
+          tmpObj = {
+            chat_record_id: data.user_id_data.chat_record_id,
+            friend_id: data.friend_id,
+            send_type: 1,
+            top_type: 1,
+            user_headimg2: data.user_id_data.user_headimg,
+            user_id: userId,
+            user_id2: data.user_id2,
+            user_name: data.user_id_data.user_name,
+            user_name2: data.user_id_data.user_name2,
+            add_time: this.utils.dateFormat('yyyy-MM-dd HH:dd:ss')
+          }
+        } else if(userId == data.user_id2) {
+          tmpObj = {
+            chat_record_id: data.user_id2_data.chat_record_id,
+            friend_id: data.friend_id,
+            send_type: 1,
+            top_type: 1,
+            user_headimg2: data.user_id2_data.user_headimg,
+            user_id: userId,
+            user_id2: data.user_id2,
+            user_name: data.user_id_data.user_name,
+            user_name2: data.user_id_data.user_name2,
+            add_time: this.utils.dateFormat('yyyy-MM-dd HH:dd:ss')
+          }
+        }
+        this.friendList.unshift(tmpObj)
+        localStorage.setItem('friendList', JSON.stringify(this.friendList)) 
+        eventWatch.$emit('agreeFriend', tmpObj)
+      } else if(data.msg_type == 'friendAdd'){ // 添加好友
+        if(userId == data.user_id) { 
+          // 本人发出添加朋友处理
+        } else if(userId == data.user_id2) {
+          tmpObj = {
+            friend_add_id: data.friend_add_id,
+            user_id: data.user_id,
+            add_time: this.utils.dateFormat('yyyy-MM-dd HH:dd:ss'),
+            user_id2: data.user_id2,
+            user_headimg: data.user_id_data.user_headimg,
+            type: 1,
+            name: data.user_id_data.user_name
+          }
+
+          let hasItemIndex = -1 // 新的好友内是否已经存在该信息
+          this.firendAddList.forEach((item,index) => {
+            if(item.user_id == user_id) {
+              hasItemIndex = index
+            }
+          })
+          if(hasItemIndex == -1) {
+            this.firendAddList = this.firendAddList.push(tmpObj)
+          } else {
+            this.firendAddList[hasItemIndex] = tmpObj
+          }
+          let addNum = 0
+          this.firendAddList.forEach(item =>{
+              if(item.type == 1) {
+                addNum+=1
+              }
+          })
+          eventWatch.$emit('newFriendNum', addNum)
+          localStorage.setItem('firendAddList', JSON.stringify(this.firendAddList))
+          eventWatch.$emit('friendAdd', tmpObj)
+        }
+      }
+    },
+    // 处理聊天信息
+    handleChatList(allData) { 
+      let data = {
+        top_type: allData.top_type, //1-非置顶列表 2-置顶列表
+        chat_record_id: allData.chat_record_id,
+        name: allData.name,
+        type: 1,
+        send_type: 1,
+        headimg: '',
+        add_time: allData.add_time,
+        from_user_id: allData.from_user_id,
+        from_user_name: allData.from_user,
+        to_user_id: allData.to_user_id,
+        to_user_name: allData.to_user,
+        content: allData.content,
+        is_du: 1,
+        unread: 0,
+      }
+      let that = this;
+      let tmpList = [] // 置顶或者非置顶 临时列表
+      let tmpObj = {} // 模拟左侧消息列表 返回数据obj
+      let msgObj = {} // 模拟消息列表每一项聊天记录obj
+      let isHas = false //左侧消息列表是否存在此条消息
+      let curIndex = 0
+
+      if(data.top_type == 1) {//非置顶列表
+        tmpList = JSON.parse(JSON.stringify(this.msgNormalList))
+      } else if(data.top_type == 2) { //置顶列表
+        tmpList = JSON.parse(JSON.stringify(this.msgTopList))
+      }
+      msgObj = {
+        add_time: data.add_time,
+        msg_list_time: that.utils.handelChatTime(new Date(data.add_time).getTime(), 1),
+        chat_list_time: that.utils.handelChatTime(new Date(data.add_time).getTime(), 2),
+        from_user_id:data.from_user_id,
+        from_user_name: data.from_user_name,
+        to_user_id:data.to_user_id,
+        to_user_name: data.to_user_name,
+        content: data.content,
+        is_du: data.is_du, // 【预留字段】 1-未读 2-已读
+      }// 当前新消息obj
+
+      for(let i = 0; i < tmpList.length; i++) {
+        if(data.chat_record_id == tmpList[i].chat_record_id) { // 如果新消息 在左侧消息列表已存在
+          isHas = true
+          this.chatObj[tmpList[i].chat_record_id].unshift(msgObj)
+          tmpList[i].recordlists.unshift(msgObj)
+          if(this.selectInfo.chat_record_id != tmpList[i].chat_record_id) {
+            tmpList[i].unread+=1
+          }
+          tmpList.unshift(tmpList[i])
+          tmpList.splice(i+1,1)
+          break;
+        }
+      }
+      if(!isHas) { // 如果新消息不存在
+        tmpObj = {
+            chat_record_id: data.chat_record_id,
+            name: data.name, // 用户聊天-为发送人的name 群消息-为群昵称
+            headimg: data.headimg, //头像
+            type: data.type, //1-用户对话 2-群信息,
+            top_type: data.top_type, // 是否置顶 1-未置顶 2-置顶
+            send_type: data.send_type, // 1-已开启新消息提醒 2-已开启消息免打扰
+            unread: data.unread ? data.unread+1 :1, //【预留字段】 消息条数
+            recordlists: [msgObj], //消息记录列表
+          }
+          tmpList.unshift(tmpObj)
+          this.chatObj[data.chat_record_id] = [msgObj]
+      }else {
+        // this.chatObj[data.chat_record_id] = [msgObj]
+      }
+      if(data.chat_record_id == this.selectInfo.chat_record_id) {
+          document.querySelector('#menuListScroll .el-scrollbar__wrap').scrollTop = 0
+          tmpList[0].isSelect = true
+          let tmpChatList = tmpList[0].recordlists
+          if(tmpChatList && tmpChatList.length > 0) {
+            tmpChatList = tmpChatList.sort(this.utils.sortBy('add_time',true))
+            // tmpChatList.forEach(item =>{
+            //   item.show_time = this.utils.handleChatList(new Date(item.add_time),2)
+            // })
+          }
+          this.curChatList = tmpChatList
+          this.$nextTick(() =>{
+            document.querySelector('#chatScroll .el-scrollbar__wrap').scrollTop = document.querySelector('.main-con').clientHeight
+          })
+      }
+
+      // 左侧消息列表重新赋值
+      if(data.top_type == 1) {//非置顶列表
+        this.$nextTick(() =>{
+          this.msgNormalList = tmpList
+        })
+      } else if(data.top_type == 2) { //置顶列表
+        this.$nextTick(() =>{
+          this.msgTopList = tmpList
+        })
+      }  
+    },
+    // 搜索列表点击去聊天
+    toChatBySearch(row) {
+      this.isShowRightMenu = false
+      this.msgTopList.map(item =>{
+        item.isSelect = false
+        return item
+      })
+      this.msgNormalList.map(item =>{
+        item.isSelect = false
+        return item
+      })
+
+      this.selectInfo = {
+          chat_record_id: row.chat_record_id,
+          name: row.name,
+          headimg: row.headimg ? row.headimg : (row.type == 1 ? this.defaultAvatar : this.defaultGroupImg),
+          userId: row.uid,
+          type: row.type,
+          userList: row.userList
+      }
+      // this.curChatList = row.recordlists
+      
+
+      let that = this;
+      let tmpList = [] // 置顶或者非置顶 临时列表
+      let tmpObj = {} // 模拟左侧消息列表 返回数据obj
+      let msgObj = {} // 模拟消息列表每一项聊天记录obj
+      let isHas = false //左侧消息列表是否存在此条消息
+
+      if(row.top_type == 1) {//非置顶列表
+        tmpList = JSON.parse(JSON.stringify(this.msgNormalList))
+      } else if(row.top_type == 2) { //置顶列表
+        tmpList = JSON.parse(JSON.stringify(this.msgTopList))
+      }
+      for(let i = 0; i < tmpList.length; i++) {
+        if(row.chat_record_id == tmpList[i].chat_record_id) { // 如果新消息 在左侧消息列表已存在
+          isHas = true
+          tmpList.unshift(tmpList[i])
+          tmpList.splice(i+1,1)
+          break;
+        }
+      }
+      if(!isHas) { // 如果新消息不存在
+        tmpObj = {
+            chat_record_id: row.chat_record_id,
+            name: row.name, // 用户聊天-为发送人的name 群消息-为群昵称
+            headimg: row.headimg, //头像
+            type: row.type, //1-用户对话 2-群信息,
+            top_type: row.top_type, // 是否置顶 1-未置顶 2-置顶
+            send_type: row.send_type, // 1-已开启新消息提醒 2-已开启消息免打扰
+            unread: 0, //【预留字段】 消息条数
+            recordlists: [], //消息记录列表
+          }
+          tmpList.unshift(tmpObj)
+          this.chatObj[row.chat_record_id] = []
+       }
+          tmpList[0].isSelect = true
+          let tmpChatList = tmpList[0].recordlists
+          if(tmpChatList && tmpChatList.length > 0) {
+            tmpChatList = tmpChatList.sort(this.utils.sortBy('add_time',true))
+          }
+          this.curChatList = tmpChatList
+          this.isFirst = false
+          this.isSearch = false
+          this.searchVal = ''
+          this.sendVal = ''
+          this.$nextTick(() =>{
+            document.querySelector('#menuListScroll .el-scrollbar__wrap').scrollTop = 0
+            document.querySelector('#chatScroll .el-scrollbar__wrap').scrollTop = document.querySelector('.main-con').clientHeight
+          })
+          this.$forceUpdate()
+
+      // 左侧消息列表重新赋值
+      if(row.top_type == 1) {//非置顶列表
+        this.$nextTick(() =>{
+          this.msgNormalList = tmpList
+        })
+      } else if(row.top_type == 2) { //置顶列表
+        this.$nextTick(() =>{
+          this.msgTopList = tmpList
+        })
+      }  
+      this.isShowChatPeople = false
+      this.$forceUpdate()
+
+      // this.$nextTick(() =>{
+      //   this.chatScrollEvent(true)
+      // })
+    },
+    // 处理 搜索列表点击好友或群之后的数据
+    handleData() {
+      let that = this;
+
+    },
+    //消息列表 点击去聊天
+    toChat(row,index) {
+        this.isShowRightMenu = false
+        this.msgTopList.map(item =>{
+          item.isSelect = false
+          return item
+        })
+        this.msgNormalList.map(item =>{
+          item.isSelect = false
+          return item
+        })
+        row.isSelect = true
+        let tmpUserList = []
+        if(row.type == 1) { 
+          tmpUserList = [{
+             user_names: row.name,
+             user_headimgs: row.headimg
+          }]
+        } else if(row.type == 2) {
+           tmpUserList = this.clusterObj[row.cluster_id]
+        }
+        this.selectInfo = {
+          chat_record_id: row.chat_record_id,
+          name: row.name,
+          headimg: row.headimg ? row.headimg : (row.type == 1 ? this.defaultAvatar : this.defaultGroupImg),
+          userId: row.uid,
+          userList: tmpUserList,
+          type: row.type
+        }
+        this.selectMsgItem = row
+        this.selectMsgIndex = index
+        if(row.recordlists && row.recordlists.length > 1) {
+          row.recordlists = row.recordlists.sort(this.utils.sortBy('add_time',true))
+          this.curChatList = row.recordlists
+        } else {
+          this.curChatList = row.recordlists
+        }
+      
+        // this.curInitChatList =
+        this.curChatScrollY = document.querySelector('#menuListScroll .el-scrollbar__wrap').scrollTop
+        this.isFirst = false
+        this.sendVal = ''
+        this.isShowChatPeople = false
+        this.setMsgDu()
+        this.$forceUpdate()
+
+        this.$nextTick(() =>{
+          this.chatScrollEvent(true)
+        })
+    },
+    // 点击聊天把消息设置已读
+    setMsgDu() {
+      let that = this;
+      that.ajax("setDu",{
+        chat_record_id: this.selectMsgItem.chat_record_id,
+      },'消息设置已读失败',res => {
+        if(res.errno == 0) {
+          this.selectMsgItem.unread = 0
+          if(this.selectMsgItem.top_type == 1) {
+            this.msgNormalList[this.selectMsgIndex].unread = 0
+          } else if(this.selectMsgItem.top_type == 2) {
+            this.msgTopList[this.selectMsgIndex].unread = 0
+          }
+        }
+        },err => { }
+      )
+    },
+    //消息列表 置顶or取消置顶
+    toSetTop() {
+      this.isShowRightMenu = false
+      this.$message('您点击了'+ (this.rightClickItem.top_type == 2 ? '取消置顶' : '置顶'))
+
+      if(this.rightClickItem.top_type == 2) {
+        this.setTopType(1,this.rightClickItem.type,this.rightClickItem.uid)
+
+        // this.rightClickItem.top_type = 1
+        // this.msgTopList.splice(this.rightClickIndex,1) 
+        // if(this.rightClickItem.isSelect) { // 如果当前取消置顶的是正在聊天的 滚动到上次记录的距离
+        //   document.querySelector('#menuListScroll .el-scrollbar__wrap').scrollTop = this.curChatScrollY
+        // }
+      } else { // 置顶左侧导航栏滚动到最顶部 并追加到置顶数组
+        this.setTopType(2,this.rightClickItem.type,this.rightClickItem.uid)
+
+        // this.rightClickItem.top_type = 2
+      //   this.setTopType(2,this.rightClickItem.type,this.rightClickItem.uid)
+        // document.querySelector('#menuListScroll .el-scrollbar__wrap').scrollTop = 0
+        // this.rightClickItem.top_type = 2
+        // this.msgTopList.unshift(this.rightClickItem)
+      }
+    },
+    //请求置顶or非置顶接口
+    setTopType(setTop,type,id) {  
+      let that = this;
+      that.ajax("setTopType",{
+        top_type: setTop,
+        type: type,
+        id: id
+      },setTop == 1 ? '取消置顶失败' : '置顶失败',res => {
+        if(res.errno == 0) {
+          if(setTop == 1) {
+            this.rightClickItem.top_type = 1
+            this.msgTopList.splice(this.rightClickIndex,1) 
+            if(this.rightClickItem.isSelect) { // 如果当前取消置顶的是正在聊天的 滚动到上次记录的距离
+              document.querySelector('#menuListScroll .el-scrollbar__wrap').scrollTop = this.curChatScrollY
+            }
+          } else if(setTop == 2) { // 置顶左侧导航栏滚动到最顶部 并追加到置顶数组
+              document.querySelector('#menuListScroll .el-scrollbar__wrap').scrollTop = 0
+              this.rightClickItem.top_type = 2
+              this.msgTopList.unshift(this.rightClickItem)
+          }
+        }
+        },err => {
+        }
+      )
+    },
+    //消息列表 消息免打扰与开启消息提醒
+    toSetMsg() {
+      this.isShowRightMenu = false
+      if(this.rightClickItem.send_type == 2) {
+        this.setSendType(1,this.rightClickItem.type,this.rightClickItem.uid)
+      }else {
+        this.setSendType(2,this.rightClickItem.type,this.rightClickItem.uid)
+      }
+      this.$message('您点击了'+ (this.rightClickItem.send_type == 2 ? '开启新消息提醒' : '消息免打扰'))
+    },
+    // 请求消息免打扰接口
+    setSendType(setSend,type,id) {  
+      let that = this;
+      that.ajax("setSendType",{
+        send_type: setSend,
+        type: type,
+        id: id
+      },setSend == 1 ? '开启新消息提醒失败' : '设置免打扰失败',res => {
+        if(res.errno == 0) {
+          this.rightClickItem.send_type = setSend
+        }
+        },err => {
+        }
+      )
+    },
+    //消息列表 删除消息记录
+    toDelByMsgList() {  
+      this.isShowRightMenu = false
+      this.$message('您点击了删除聊天')
+      this.delApiByMsgList(this.rightClickItem.chat_record_id)
+    },
+    // 消息列表 删除api
+    delApiByMsgList(id) { 
+      let that = this;
+      that.ajax("recordLogDel",{
+        record_id: id,
+      },'删除聊天记录失败',res => {
+        if(res.errno == 0) {
+         if(this.rightClickItem.top_type == 1) {
+            this.msgNormalList.splice(this.rightClickIndex,1)
+          } else if(this.rightClickItem.top_type == 2) {
+            this.msgTopList.splice(this.rightClickIndex,1)
+          }
+        }
+        },err => {
+        }
+      )
+    },
+    // 消息列表滚动事件
+    menuListScrollEvent() {
+      let that = this;
+      let scrollDom = document.querySelector('#menuListScroll .el-scrollbar__wrap') //当前滚动事件监听的dom
+		  scrollDom.onscroll = e =>{
+        let scrollTop = e.srcElement.scrollTop //滚动距离
+        let clientHeight = e.srcElement.clientHeight //可见高度
+        let scrollHeight = e.srcElement.scrollHeight 
+        if(scrollHeight - scrollTop -  clientHeight <= 10) {
+          // console.log('滚动到了最底部')
+          // that.getPageMsgListByNormal()
+        }
+      }
+      // console.log(document.querySelector('#menuListScroll').scrollTop)
+    },
+    // 键盘弹起事件
+    textareaKeyup(e) {
+      if(e.ctrlKey && e.keyCode==13) {   //用户点击了ctrl+enter触发换行
+        this.sendVal += '\n'; 
+      }else { //用户点击了enter触发
+        this.chatSubmit();
+      }  
+    },
+    // 提交聊天
+    chatSubmit() {
+      if(this.socketType != 'success') {
+        if(this.socketType == 'loading') {
+          this.isSenValTip = '正在连接,请稍后点击'
+        } else if(this.socketType == 'err') {
+          this.isSenValTip = '连接错误,已断开连接'
+        } else if(this.socketType == 'close') {
+          this.isSenValTip = '连接关闭，请等待重连'
+        }
+        this.isSendValShow = true
+        setTimeout(() =>{
+          this.isSendValShow = false
+        },2000)
+        return
+      }
+      
+      if(this.sendVal.trim() == '') {
+        this.isSenValTip = '不能发送空白消息'
+        this.isSendValShow = true
+        this.sendVal = ''
+        setTimeout(() =>{
+          this.isSendValShow = false
+        },2000)
+        return
+      }
+      let sendMsgObj = {
+        msg_type: "user",
+        msg: this.sendVal, 
+        user_id:this.userId,
+        from_user_id:this.userId,
+        to_user_id:this.selectInfo.userId,
+        chat_record_id: this.selectInfo.chat_record_id
+      }
+     
+      this.isSendValShow = false
+      this.sendVal = ''
+      this.sendMsg(sendMsgObj);
+    },
+    // 监听聊天记录中的滚动事件 
+    chatScrollEvent(isFirst) {
+      let that = this;
+      let scrollEl = that.$refs.chatScroll.wrap //当前滚动事件挂载dom
+      let chatMainH = document.querySelector('.main-con').clientHeight // 当前聊天记录dom的高度
+      let chatDomH = document.querySelector('#chatScroll .el-scrollbar__wrap').clientHeight // 当前聊天框的高度
+      let scrollDom = document.querySelector('#chatScroll .el-scrollbar__wrap') //当前滚动事件监听的dom
+      scrollDom.scrollTop = chatMainH // 当点进聊天框滚动距离默认滑到最底部
+      if(isFirst) {
+	  	scrollEl.onscroll = e =>{
+        let scrollTop = document.querySelector('#chatScroll .el-scrollbar__wrap').scrollTop //滚动距离
+        let clientHeight = document.querySelector('#chatScroll .el-scrollbar__wrap').clientHeight //可见高度
+        let scrollHeight = document.querySelector('#chatScroll .el-scrollbar__wrap').scrollHeight 
+        if(scrollTop == 10) {
+          // that.getPageMsgListByNormal()
+        } else {
+          // console.log('1----')
+        }
+        return
+
+        if(chatDomH + scrollDom.scrollTop  > document.querySelector('.main-con').clientHeight - chatDomH) { 
+          that.isNewInfo = false
+        } else { // 当前滚动超出当前聊天框  如有新消息右侧悬浮提示
+          that.isNewInfo = true
+        }
+        if(scrollDom.scrollTop == 0) {//当滚动到顶部的时候 加载以前的数据
+          // that.loadOldChatList()
+        }
+		  }
+	  }
+    },
+    // 监听聊天记录滚动到顶部
+    loadOldChatList(){
+      this.chatLoading = true
+      // if(this.curChatList[0])
+      let data = [{"add_time":"2020-12-11 17:50:04","chat_record_id":1,"from_user_id":35,"from_user_name":"测试from","to_user_id":73,"to_user_name":"测试to","content":"我是一条二人对话置顶消息","is_du":1},{"add_time":"2020-12-11 17:50:04","chat_record_id":1,"from_user_id":35,"from_user_name":"测试from","to_user_id":73,"to_user_name":"测试to","content":"我是一条二人对话置顶消息","is_du":1},{"add_time":"2020-12-11 17:50:04","chat_record_id":1,"from_user_id":35,"from_user_name":"测试from","to_user_id":73,"to_user_name":"测试to","content":"我是一条二人对话置顶消息","is_du":1},{"add_time":"2020-12-11 17:50:04","chat_record_id":1,"from_user_id":35,"from_user_name":"测试from","to_user_id":73,"to_user_name":"测试to","content":"我是一条二人对话置顶消息","is_du":1},{"add_time":"2020-12-11 17:50:04","chat_record_id":1,"from_user_id":35,"from_user_name":"测试from","to_user_id":73,"to_user_name":"测试to","content":"我是一条二人对话置顶消息","is_du":1},{"add_time":"2020-12-11 17:50:04","chat_record_id":1,"from_user_id":35,"from_user_name":"测试from","to_user_id":73,"to_user_name":"测试to","content":"我是一条二人对话置顶消息","is_du":1},{"add_time":"2020-12-11 17:50:04","chat_record_id":1,"from_user_id":35,"from_user_name":"测试from","to_user_id":73,"to_user_name":"测试to","content":"我是一条二人对话置顶消息","is_du":1},{"add_time":"2020-12-11 17:50:04","chat_record_id":1,"from_user_id":35,"from_user_name":"测试from","to_user_id":73,"to_user_name":"测试to","content":"我是一条二人对话置顶消息","is_du":1}]
+      this.curChatList = data.concat(this.curChatList)
+      setTimeout(() =>{
+        this.chatLoading = false
+      },3000)
+    }
+  },
+  destroyed() {
+    this.socket.close() 
+  }
+};
+</script>
+<style lang="less">
+// div { box-sizing: border-box }
+// .el-scrollbar__wrap {
+//   overflow: hidden;
+// }
+.el-popover { margin-top: 35px;}
+.msg-list {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    // font-family:"STHeiti";
+    overflow: hidden;
+    .msg-list-con {
+        width: 20%;
+        height: 100%;
+        background: #fff;
+        border-right: 1px solid #eaeaeb;
+        overflow: hidden;
+        .search-con {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          height: 40px;
+          margin: 10px;
+          .search-input {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid #eee;
+            border-radius: 1000px;
+            height: 100%;
+            padding: 5px;
+            overflow: hidden;
+            .el-icon-search {
+              padding: 0 8px; 
+              color: #9a9ea2;
+            }
+            .el-input {
+              .el-input__inner {
+                border: none;
+                padding: 0;
+              }
+            }
+          }
+          .plus-con {
+            border: 1.5px solid #f6f6f7;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px;
+            border-radius: 100px;
+            margin-left: 10px;
+            .el-icon-plus {
+              color: #72787e;
+              font-weight: bold;
+              cursor: pointer;
+            }
+          }
+        }
+
+        .hot-key-con {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 3px 10px;
+          color: #d1d4d5;
+          border: 1px solid #f6f6f7;
+          height: 40px;
+          .key-con {
+            width: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            i {
+              font-size: 1.2rem;
+              font-weight: bold;
+            }
+          }
+          i {
+            cursor: pointer;
+          }
+        }
+        .list-con {
+          // padding-left: 10px;
+          height: calc(100% - 100px);
+          .request-status {
+            color: #d1d4d5;
+            text-align: center;
+            padding: 20px 0;
+            font-size: 0.9rem
+          }
+          .info-item {
+            position: relative;
+            height: 68px;
+            padding-left: 10px;
+            overflow: hidden;
+           .info-item-con {
+              width: 100%;
+              height: 100%;
+              padding: 10px 0;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              border-bottom: 2px solid #f8f8f9;
+              cursor: pointer;
+              .avatar {
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+              }
+              .info-con {
+                width: calc(100% - 50px);
+                height: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                flex-direction: column;
+                  .tit-con {
+                    width: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    .tit {
+                      white-space: nowrap;
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                      width: calc(100% - 70px); 
+                      font-weight: bold;
+                      color: #333;
+                      font-size: 0.95rem;
+                    }
+                    .date {
+                      width: 70px;
+                      text-align: center;
+                      color: #d8dadb;
+                      font-size: 0.8rem;
+                    }
+                  }
+                  .last-msg-con {
+                    width: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    color: #b5b7bb;
+                    font-size: 0.9rem;
+                    padding-right: 10px;
+                    .last-msg {
+                      max-width: 100%;
+                      white-space: nowrap;
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                      padding-right: 5px;
+                    }
+                    .num {
+                      // max-width:20px;
+                      min-width: 20px;
+                      height: 20px;
+                      border-radius: 100px;
+                      background: #fb602b;
+                      color: #fff;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      padding: 6px;
+                      font-size: 0.8rem;
+                    }
+                  }
+              }
+
+              .group-dot {
+                position: absolute;
+                top: 10px;
+                left: 10px;
+                width: 10px;
+                height: 10px;
+                background: #fb602b;
+                border-radius: 50%;
+              }
+              .no-disturb {
+                width: 15px;
+              }
+              .is-top {
+                position: absolute;
+                right: 0px;
+                top: 0;
+                width: 15px;
+              }
+           }
+            
+          }
+          .info-item:hover {
+             background: #f4f4f4;
+            .info-item-con {
+              border-color: #f4f4f4;
+            }
+          }
+          .is-top-bg {
+            background: #f9f9f9;
+            .info-item-con {
+              border-color: #f9f9f9;
+            }
+          }
+          .is-select-bg {
+            background: #eeeeee!important;
+            .info-item-con {
+              border-color: #eeeeee!important;
+            }
+          }
+        }
+        .search-data-con {
+          height: calc(100% - 60px);
+          .search-item {
+            display: flex;
+            flex-direction: column;
+            .tit {
+              font-size: 0.9rem;
+              padding: 5px;
+              background: #eef1f3;
+            }
+          }
+          .search-item-con {
+            display: flex;
+            align-items: center;
+            padding: 8px 5px;
+            border-bottom: 2px solid #f8f8f9;
+            cursor: pointer;
+            .avatar {
+              width: 40px;
+              height: 40px;
+              border-radius: 50%;
+              img {
+                width: 100%;
+                height: 100%;
+              }
+            }
+            .name-con {
+              flex: 1;
+              display: flex;
+              flex-direction: column;
+              padding-left: 10px;
+              font-weight: bold;
+              .desc {
+                font-size: 0.8rem;
+                padding-top: 3px;
+              }
+            }
+          }
+          .search-item-con:hover {
+            background: #eeeeee;
+          }
+          .request-status {
+            color: #999;
+            text-align: center;
+            padding: 10px 0;
+            font-size: 0.9rem
+          }
+        }
+    }
+
+    .chat-con {
+      position: relative;
+      width: 80%;
+      height: 100%;
+      background: #eef1f3;
+      border-radius: 0 0 6rem 0;
+      .chat-name-con {
+        width: 100%;
+        height: 60px;
+        padding: 0 20px;
+        background: #f2f4f5;
+        display: flex;
+        align-items: center;
+        .chat-avatar {
+          width: 45px;
+          height: 45px;
+          border-radius: 50%;
+          cursor: pointer;
+
+        }
+        .chat-tit {
+          font-weight: bold;
+          padding-left: 15px;
+          font-size: 1.2rem;
+          cursor: pointer;
+
+        }
+        .arrow-icon {
+          margin-left: 10px;
+          color: #999;
+          font-weight: bold;
+          cursor: pointer;
+
+        }
+      }
+      .chat-main {
+        position: relative;
+        width: 100%;
+        height: calc(100% - 280px);
+        background: #eef1f3; 
+        .chat-people {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+           box-shadow: 0 5px 10px -5px #cccccc;
+           z-index: 99;
+            background: #eef1f3; 
+          #chatPeopleScroll {
+            // max-height: 100px;
+            .scrollbar-wrapper {
+              max-height: 300px;
+            }
+          }
+          .people-con {
+            padding: 20px;
+            padding-bottom: 0;
+            //  max-height: 100px;
+            .avatar-con {
+              width: 80px;
+              height: 90px;
+              overflow: hidden;
+              float: left;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              // margin-right: 20px;
+              // margin-bottom: 20px;
+              .avatar {
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
+              }
+              .name {
+                color: #888;
+                font-size: 0.9rem;
+                line-height: 30px;
+                width: 100%;
+                text-align: center;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+              }
+            }
+          }
+        }
+        .main-con {
+          padding: 0 20px;
+          .request-status {
+            color: #d1d4d5;
+            text-align: center;
+            padding: 20px 0;
+            font-size: 0.9rem
+          }
+          .left-info {
+            display: flex;
+            flex-direction: column;
+            padding-bottom: 15px;
+            .date {
+              padding: 10px;
+              color: #9B9B9B;
+              text-align: center;
+            }
+            .item-con {
+               display: flex;
+               padding-right: 55px;
+              .left-avatar {
+                padding-right: 10px;
+                img {
+                  width: 45px;
+                  height: 45px;
+                }
+              }
+              .right-con {
+                display: flex;
+                flex-direction: column;
+                max-width: calc(100% - 55px);
+                .name-con {
+                  display: flex;
+                  align-items: center;
+                  padding-bottom: 8px;
+                  .name {
+                    color: #9B9B9B;
+                    font-size: 1rem;
+                  }
+                  .tag {
+                    border: 1px solid #0085F9;
+                    color: #0085F9;
+                    font-size: 0.5rem;
+                    font-weight: bold;
+                    border-radius: 100px;
+                    padding: 2px 5px;
+                    margin-left: 10px;
+                  }
+                }
+                .msg-con {
+                  display: flex;
+                  align-items: center;
+                  .msg {
+                    position: relative;
+                    background: #fff;
+                    color: #333;
+                    padding: 10px;
+                    border-radius: 0 14px 14px 14px;
+                    border: 1px solid #DFDFDF;
+                    word-break: break-all;
+                    word-wrap: break-word;
+                    
+                  }
+                  
+                }
+              }
+
+            }
+            
+          }
+          .right-info {
+            display: flex;
+            flex-direction: column;
+            padding-bottom: 15px;
+             .date {
+              padding: 10px;
+              color: #9B9B9B;
+              text-align: center;
+            }
+            .item-con {
+               display: flex;
+               padding-left: 55px;
+              .right-avatar {
+                padding-left: 10px;
+                img {
+                  width: 45px;
+                  height: 45px;
+                }
+              }
+              .left-con {
+                display: flex;
+                flex-direction: column;
+                width: calc(100% - 55px);
+                .name-con {
+                  display: flex;
+                  align-items: center;
+                  justify-content: flex-end;
+                  padding-bottom: 8px;
+                  .name {
+                    color: #9B9B9B;
+                    font-size: 1rem;
+                  }
+                  .tag {
+                    border: 1px solid #0085F9;
+                    color: #0085F9;
+                    font-size: 0.5rem;
+                    font-weight: bold;
+                    border-radius: 100px;
+                    padding: 2px 5px;
+                    margin-right: 10px;
+                  }
+                }
+                .msg-con {
+                  display: flex;
+                  align-items: center;
+                  justify-content: flex-end;
+                  
+                  .msg {
+                    position: relative;
+
+                    background: #0085f9;
+                    color: #fff;
+                    padding: 10px;
+                    border-radius: 14px 0 14px 14px;
+                    border: 1px solid #0085f9;
+                    word-break: break-all;
+                    word-wrap: break-word;
+                    .socket-type-con {
+                      position: absolute;
+                      left: 0;
+                      top: 50%;
+                      transform: translate(-150%,-50%);
+                      color: #999;
+                    }
+                  }
+                }
+              }
+            }
+            
+          }
+        }
+        
+        
+      }
+      .chat-input {
+        width: 100%;
+        height: 220px;
+        background: #f2f4f5;
+        display: flex;
+        flex-direction: column;
+        .btn-con {
+          display: flex;
+          align-items: center;
+          padding: 10px 20px;
+          .btn-item {
+            font-size: 22px;
+            color: #747b80;
+            margin-right: 20px;
+            cursor: pointer;
+          }
+        }
+        .input-con {
+          .el-textarea__inner {
+            resize:none ;
+            background: #f2f4f5;
+            border: none;
+            font-size: 1rem;
+            padding-left: 20px;
+            border-radius: 0;
+          }
+          ::-webkit-input-placeholder { color:#687076; }
+          ::-moz-placeholder { color:#687076; } /* firefox 19+ */
+          :-ms-input-placeholder { color:#687076; } /* Internet Explorer 10+ */
+          :-moz-placeholder { color:#687076; } 
+        }
+        .submit-con {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          padding: 10px 20px;
+          .desc {
+            color: #a7abaf;
+            margin-right: 10px;
+          }
+          .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 25px;
+            background: #fff;
+            color: #d6d9da;
+            border: 1px solid #eee;
+            border-radius: 100px;
+            cursor: pointer;
+            position: relative;
+            .no-message-popover {
+              position: absolute;
+              background: #fff;
+              color: #000;
+              top: -10px;
+              right: 0;
+              transform: translateY(-100%);
+              border: 1px solid #ddd;
+              padding: 10px 20px;
+              border-radius: 4px;
+              border: 1px solid #ebeef5;
+              box-shadow: 0 2px 12px 0 rgba(0,0,0,.1);
+              width: 200px;
+              text-align: center;
+                .triangle{
+                   em{
+                    position: absolute;
+                    width: 0px;
+                    height: 0px;
+                    border: 10px dashed #fff;
+                    border-color: #ebeef5 transparent transparent transparent; 
+                    left: 130px;
+                    top: 40px;
+                 }
+                  span{
+                      position: absolute;
+                      width: 0px;
+                      height: 0px;
+                      border: 10px dashed #fff;
+                      border-color: white transparent transparent transparent; 
+                      left: 130px;
+                      top: 40px;
+                  }
+                }
+            }
+          }
+          .btn:hover {
+            background: #0085F9;
+            color: #fff;
+            border-color: #0085F9;
+          }
+          .btn:active {
+            opacity: 0.8;
+          }
+        }
+     }
+     .no-chat-con {
+       position: absolute;
+       left: 50%;
+       top:50%;
+       transform: translate(-50%,-50%);
+       width: 30%;
+       display: flex;
+       align-items: center;
+       justify-content: center;
+       flex-direction: column;
+        .no-img {
+          width: 100%;
+        }
+        .no-text {
+          color: #999;
+        }
+     }
+    }
+   .menu-dialog {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 9999;
+      width: 125px;
+      background: #fff;
+      border-radius: 4px;
+      box-shadow: 0 8px 8px 0 rgba(0,0,0,.1);
+      border: 1px solid #d9d9d9;
+      .btn-iem {
+        // padding: 8px 0;
+        color: #333;
+        font-size: 0.9rem;
+        height: 40px;
+        line-height: 40px;
+        padding-left: 10px;
+        cursor: pointer;
+      }
+      .btn-iem:hover {
+        background: #c9c9c9;
+      }
+      .pad10{
+        padding: 10px 0;
+      }
+   }
+}
+
+.menu-popover {
+  cursor: pointer;
+  width: 80px;
+  .menu-btns {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction:column; 
+  }
+}
+
+</style>

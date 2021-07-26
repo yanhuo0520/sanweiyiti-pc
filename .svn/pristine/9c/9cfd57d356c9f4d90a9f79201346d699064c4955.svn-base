@@ -1,0 +1,357 @@
+<template>
+    <div class="login" @click="isShowPopover = false">
+      <div class="login-bg">
+        <img class="login-banner" src="../images/login/login-banner.png" alt="">
+        <img class="right-top-img" src="../images/login/right-top-img.png" alt="">
+        <img class="right-bot-img" src="../images/login/right-bot-img.png" alt="">
+        <img class="left-bot-img" src="../images/login/left-bot-img.png" alt="">
+         <img class="login-box" src="../images/login/login-box.png" alt="">
+          <div class="login-form">
+              <div class="login-tit">登录</div>
+              <el-form class="login-form-con" ref="loginForm" :model="loginForm" :rules="rules" >
+                <el-form-item prop="uname" >
+                  <div class="form-item-con">
+                    <div class="icon-con">
+                        <img class="icon" src="../images/login/account-icon.png" alt="">
+                    </div>
+                    <el-input v-model="loginForm.uname" placeholder="请输入用户名" @keyup.enter.native="submitForm('loginForm')"></el-input>
+                  </div>
+                </el-form-item>
+                <el-form-item  prop="password">
+                  <div class="form-item-con" >
+                    <div class="icon-con">
+                        <img class="icon" src="../images/login/pwd-icon.png" alt="">
+                    </div>
+                    <el-input v-model="loginForm.password" placeholder="请输入密码" show-password @keyup.enter.native="submitForm('loginForm')"></el-input>
+                  </div>
+                </el-form-item>
+                <el-form-item prop="code" >
+                  <div class="form-item-con">
+                    <!-- <div class="icon-con">
+                        <img class="icon" src="../images/public/aid-br-icon.png" alt="">
+                    </div> -->
+                    <el-input v-model="loginForm.code" placeholder="请输入动态码" @keyup.enter.native="submitForm('loginForm')"></el-input>
+                  </div>
+                </el-form-item>
+                <div class="login-btn-con" @click.stop="">
+                   <el-popover placement="top-end" width="85%" trigger="manual" v-model="isShowPopover" style="width:85%" >
+                      <div class="popover-con">
+                        <div class="tit">选择角色</div>
+                        <el-radio-group v-model="isAdmin" @change="chooseRole">
+                          <el-radio :label="item.is_admin" v-for="(item,index) in isAdminArr" :key="index">{{item.post_name}}</el-radio>
+                        </el-radio-group>
+                      </div>
+                      <!-- <el-button slot="reference" @click="visible = !visible">手动激活</el-button> -->
+                      <el-button slot="reference" type="primary" @click="submitForm('loginForm')" :loading="submitLoading || getPrivilegeLoading">登录</el-button>
+                    </el-popover>
+                </div>
+              </el-form>
+              <div class="desc"  alt="">
+                <img class="company"  src="../images/login/company-bg.png" alt="">
+              </div>
+          </div>
+      </div>
+    </div>
+</template>
+<script>
+export default {
+  name: "login",
+  data() {
+    return {
+      loginForm: {
+        uname: '',
+        password: '',
+        code: '',
+        fullScreenLoading: false,
+      },
+      rules: {
+        uname: [
+            { required: true, message: '请输入您的账号', trigger: 'blur' }
+        ], 
+        password: [
+            { required: true, message: '请输入登录密码', trigger: 'blur' }
+        ], 
+        code: [
+            { required: true, message: '请输入动态验证码', trigger: 'blur' }
+        ], 
+      },
+      submitLoading: false, // 请求登录loading
+      getPrivilegeLoading: false, // 请求获取权限loading
+
+      isAdmin: '', //0-社长 1-超级管理员 2-区域管理员 3-联社社长
+      isAdminArr:[], //0-社长 1-超级管理员 2-区域管理员 3-联社社长
+      isShowPopover: false,//选择角色弹窗
+    };
+  },
+  activated() {
+    // this.resetForm()
+    this.submitLoading = false;
+  },
+  methods: {
+    // 提交表单
+    submitForm(formName) {
+        let that = this
+        that.$refs[formName].validate((valid) => {
+          if (valid) {
+              let params = JSON.parse(JSON.stringify(that.loginForm))
+              params.password = that.utils.recursiveMD5(that.loginForm.password, 1)
+              that.submitLoading = true
+              that.ajax('login',params,'登录失败',res =>{
+                that.submitLoading = false
+                if(res.errno == 0) { 
+                  localStorage.setItem('account',params.uname)
+                    // 注: res.is_admin 当前角色数组 0-社长 1-超级管理员 2-区域管理员 3-合作联社社长
+                       //  当选择为超级管理员与区域管理员时 直接登录   
+                       //  当选择为社长与联社社长时 跳转选择身份页面
+                    // 逻辑: 一、当is_admin中只有一个角色时 判断当worker_job只有一个合作社并只有一个身份时直接获取权限 其他情况跳转选择角色 
+                            // (若当前is_admin只有1或者2 不用单独判断因为这俩角色下只有一个身份可以直接登录)
+                    //      二、当is_admin中有多个角色时, 弹窗选择哪个角色 如果选择1或者2直接登录 如果为0或3去除worker_job中合作社id为空的数据并判断处理之后worker_job只有一个合作社并只有一个身份时直接获取权限 其他情况跳转选择角色
+                   that.isAdminArr = res.is_admin
+                    that.workerJobArr = res.worker_job
+                    if(res.is_admin) { // res.is_admin角色数组
+                      if(res.is_admin.length == 1) {  //如果当前只有一个角色 
+                          if(res.worker_job) {
+                            localStorage.setItem('worker_job',JSON.stringify(res.worker_job))
+                            if(res.worker_job.length > 1) { // 当前账号下超过1个合作社跳转切换身份页面
+                              that.$router.push('/changeRole')
+                            } else { // 当前账号下只加入一个合作社
+                              if(res.worker_job[0].job && res.worker_job[0].job.length > 1) { // 当前合作社下有多个身份直接 跳转切换身份页面
+                                that.$router.push('/changeRole')
+                              } else { // 当前只加入一个合作社并只有一个身份 无需选择身份直接登录
+                                that.getPrivilege(res.worker_job) 
+                              }
+                            }
+                          }
+                      } else { // 如果多个角色
+                          that.isShowPopover = true
+                          // if(res.worker_job) {
+                          //   res.worker_job.forEach(item =>{  // 处理若为区域管理员
+                          //     if(item.coopera_id && Number(item.coopera_id) > 0) {
+                          //       tmpJobArr.push(item)
+                          //     } 
+                          //   })
+                          //   that.otherJobs= tmpJobArr
+                          // }
+                      }
+                    }
+                    return
+                }
+              }, err =>{
+                   that.submitLoading = false
+              })
+          } else {
+            setTimeout(()=>{
+                let isError= document.getElementsByClassName("is-error");
+                let firstErrInput = isError[0].querySelector('input')
+                  firstErrInput.focus();
+            },100);
+            return false;
+          }
+        });
+      },
+      // 如果有多个角色 弹窗选择事件
+      chooseRole(val) { // 0-社长 1-超级管理员 2-区域管理员 3-合作联社社长
+        let wokerJob = this.workerJobArr
+        let tmpNoIdJobArr = [] //区域管理员worker_job数组
+        let tmpIdJobArr = [] //其它角色worker_job数组
+        wokerJob.forEach(item =>{
+          if(item.coopera_id && Number(item.coopera_id) > 0) {
+            tmpIdJobArr.push(item)
+          } else {
+            tmpNoIdJobArr.push(item)
+          }
+        })
+        if(val == 2) {
+          localStorage.setItem('worker_job',JSON.stringify(tmpNoIdJobArr))
+          this.getPrivilege(tmpNoIdJobArr) 
+        } else {
+          localStorage.setItem('worker_job',JSON.stringify(tmpIdJobArr))
+           this.$router.push('/changeRole')
+        }
+      },
+      // 获取当前身份权限
+      getPrivilege(workerJob){
+          let that = this;
+          let cooperationInfo = {}
+          let userInfo = {}
+          cooperationInfo.name = workerJob[0].coopera_name;
+          cooperationInfo.id = workerJob[0].coopera_id;
+          userInfo.post_name = workerJob[0].job[0].post_name;
+          userInfo.post_id = workerJob[0].job[0].post_id;
+          userInfo.id = workerJob[0].job[0].user_id;
+          userInfo.job_id =  workerJob[0].job[0].job_id;
+          that.getPrivilegeLoading = true;
+          // that.fullScreenLoading = that.$loading({ text: '正在重新获取权限...', background:'rgba(0, 0, 0, 0.7)' });
+          that.ajax('get_privilege',{
+              post_id:userInfo.post_id,
+              user_id: userInfo.id,
+              job_id: userInfo.job_id
+          },'获取权限失败',res =>{
+              that.getPrivilegeLoading = false
+              if(res.errno == 0) {
+                  sessionStorage.setItem('token',res.token)
+                  localStorage.setItem('cooperationInfo', JSON.stringify(cooperationInfo))
+                  localStorage.setItem('userInfo', JSON.stringify(userInfo))
+                  localStorage.setItem('routes', JSON.stringify(res.data))
+                  localStorage.setItem('is_admin', workerJob[0].job[0].is_admin)
+                  that.$router.push('/index')
+              } 
+          }, err =>{
+            that.getPrivilegeLoading = false
+            // that.fullScreenLoading.close()
+          })
+          
+      },
+      // 重置form表单
+      resetForm() {
+        this.$refs['loginForm'].resetFields();
+      }
+  }
+};
+</script>
+<style lang="less">
+.login {
+  width: 100%;
+  height: 100%;
+  position: fixed;
+  top: 0;
+  right: 0;
+  div { box-sizing: border-box; }
+  .login-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #0d4cb4;
+    .login-banner {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      transform: translateY(-50%);
+      width: 48%;
+    }
+    .right-top-img {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 20%;
+    }
+    .right-bot-img {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 20%;
+    }
+    .left-bot-img {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 20%;
+    }
+    .login-box {
+      position: absolute;
+      top: 20%;
+      right: 12%;
+      width: 28vw;
+      height: 28vw;
+    }
+    .login-form {
+      position: absolute;
+      top: 20%;
+      right: 16%;
+      width: 20vw;
+      height: 28vw;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 0 8px #000;
+      padding: 1.3rem 1.6rem; 
+      .login-tit {
+        color: #4e535f;
+        font-weight: bold;
+        font-size: 1.4  rem;
+        padding-top: 0.7rem;
+        padding-bottom: 2.5rem;
+      }
+      .login-form-con {
+        .el-form-item {
+          margin-bottom: 2rem;
+        }
+        .form-item-con {
+          display: flex;
+          align-items: center;
+          border: 1px solid #e5e5e5;
+          border-radius: 4px;
+          // margin-bottom: 1rem;
+          padding: 0.2rem 0;
+          .icon-con {
+            position: relative;
+            padding: 0.3rem 0.6rem;
+            // border-right: 1px solid red; 
+            display: flex;
+            align-items: center;
+            // margin-right: 1rem;
+             .icon {
+              width: 25px;
+              height: 25px;
+            }
+          }
+          .icon-con:after{
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 50%;
+            height: 80%;
+            width: 1px;
+            background: #e5e5e5;
+            transform: translateY(-50%)
+           
+          }
+          .el-input {
+            border: none;
+            input { border: none}
+          }
+        }
+      }
+      .login-btn-con {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        .el-button {
+          width: 100%;
+          padding: 0.9rem;
+          background: #0077eb;
+          box-shadow:  0px 7px 7px -7px  #0077eb;
+        }
+      }
+      .desc {
+        padding-top: 3rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        .company {
+          width: 80%;
+        }
+      }
+    }
+  }
+  
+}
+.popover-con {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      .tit {
+        font-weight: bold;
+        padding-bottom: 12px;
+        font-size: 0.95rem;
+      }
+      .el-radio-group {
+        .el-radio__label {
+          font-size: 0.9rem;
+        }
+      }
+    }
+
+</style>
